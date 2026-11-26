@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.5
+
+- Tolerance: a timing result within ±5 ms (volume within ±1 dB) is shown as
+  "✓ Passt" / "✓ Good", the value stays, and "Confirm & save value" saves it
+  unchanged.
+- The iPhone/iPad block from 0.4.4 is removed again: playing and measuring
+  on the same iPhone works in practice. If playback does stop, the page still
+  says so.
+
 ## 0.4.4
 
 - iPhone/iPad: iOS ends AirPlay as soon as the microphone is on, so the page

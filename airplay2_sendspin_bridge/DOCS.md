@@ -116,11 +116,12 @@ Hinweise:
 - Der Browser gibt das Mikrofon nur über **HTTPS** frei, also z. B. über die
   externe HA-Adresse. Klappt es nicht, die Seite über „In neuem Tab öffnen“
   aufrufen.
-- Auf iPhone und iPad beendet iOS die AirPlay-Wiedergabe, sobald das
-  Mikrofon an ist. Dort startet die Seite den Track deshalb nicht selbst:
-  Den Track auf einem zweiten Gerät abspielen (die Seite am Mac oder iPad
-  öffnen und ▶ tippen) und auf dem iPhone messen. Am Mac klappt Abspielen und
-  Messen auf demselben Gerät.
+- Abspielen und Messen klappen auch auf demselben iPhone. Bricht die
+  AirPlay-Wiedergabe beim Einschalten des Mikrofons doch ab, meldet die Seite
+  das; dann den Track auf einem zweiten Gerät abspielen.
+- Liegt das Ergebnis innerhalb von **±5 ms** (Lautstärke: **±1 dB**), zeigt
+  die Seite „✓ Passt“. Mit „Wert bestätigen & speichern“ wird der aktuelle
+  Wert dann unverändert gespeichert.
 - Jeder Meter Abstandsunterschied zum Mikrofon verfälscht um etwa 3 ms.
   Deshalb das Gerät in die Mitte legen.
 - Von Hand geht es auch: `latency_offset_ms` in Schritten von 20–50 ms
@@ -261,10 +262,11 @@ HomePod or Sonos and sets it automatically.
 Notes:
 - Browsers only allow the microphone over **HTTPS**, e.g. via your external
   HA address. If it doesn't work, use "Open in new tab".
-- On iPhone and iPad, iOS stops AirPlay playback as soon as the microphone
-  is on, so the page doesn't start the track itself there: play it on a
-  second device (open the page on a Mac or iPad and tap ▶) and measure on the
-  iPhone. On a Mac, playing and measuring on the same device works.
+- Playing and measuring also work on the same iPhone. If AirPlay playback
+  stops when the microphone turns on, the page tells you; then play the
+  track on a second device.
+- If the result is within **±5 ms** (volume: **±1 dB**), the page shows
+  "✓ Good". "Confirm & save value" then saves the current value unchanged.
 - Every metre of distance difference to the microphone skews the result by
   about 3 ms, so place the device in between.
 - Manual tuning also works: adjust `latency_offset_ms` in 20–50 ms steps

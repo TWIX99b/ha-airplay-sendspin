@@ -169,12 +169,11 @@ const T = DE ? {
   step2: '2 · Vorbereiten',
   i1: 'Klick-Track hier abspielen oder herunterladen:', download: 'Herunterladen',
   play: '▶ Abspielen', pause: '■ Stoppen',
-  playHint: 'Vorher die Audioausgabe des Geräts auf die AirPlay-Gruppe stellen (iPhone/iPad: Kontrollzentrum, Mac: Menüleiste › Ton). Am Mac kann die Seite gleichzeitig abspielen und messen. Auf iPhone und iPad beendet iOS AirPlay, sobald das Mikrofon an ist – dort auf einem zweiten Gerät abspielen.',
-  iosHint: 'Auf iPhone und iPad beendet iOS die AirPlay-Wiedergabe, sobald das Mikrofon an ist. Deshalb den Track auf einem zweiten Gerät abspielen: diese Seite am Mac oder iPad öffnen und dort ▶ Abspielen tippen (oder die Datei in der Musik-App abspielen). Dann hier auf Messen tippen.',
+  playHint: 'Vorher die Audioausgabe des Geräts auf die AirPlay-Gruppe stellen (iPhone/iPad: Kontrollzentrum, Mac: Menüleiste › Ton). Bricht die Wiedergabe beim Messen ab (meldet die Seite), den Track auf einem zweiten Gerät abspielen.',
   interrupted: 'Die AirPlay-Wiedergabe wurde während der Messung unterbrochen – vermutlich durch das Mikrofon. Den Track auf einem anderen Gerät oder mit der Musik-App abspielen und nochmal messen.',
   i2: 'Abgespielt wird per AirPlay auf die Gruppe aus diesem Lautsprecher und einer Referenz (HomePod/Sonos).',
   i3: 'Das Gerät mit dieser Seite ungefähr gleich weit von beiden Lautsprechern entfernt hinlegen, ruhig sein.',
-  i4: 'Beide Lautsprecher etwa gleich laut einstellen und auf Messen tippen. Läuft noch nichts, startet die Seite den Klick-Track selbst und stoppt ihn danach (nicht auf iPhone/iPad, siehe oben).',
+  i4: 'Beide Lautsprecher etwa gleich laut einstellen und auf Messen tippen. Läuft noch nichts, startet die Seite den Klick-Track selbst und stoppt ihn danach.',
   step3: '3 · Messen (ca. 20 Sekunden)', start: 'Messen',
   phA: 'Phase 1/2: Lautsprecher stumm – nur der Referenz-Lautsprecher klickt …',
   phB: 'Phase 2/2: Lautsprecher wieder an – beide klicken …',
@@ -182,7 +181,10 @@ const T = DE ? {
   result: 'Ergebnis',
   late: (d) => `Der Lautsprecher ist ${d} ms zu spät`,
   early: (d) => `Der Lautsprecher ist ${d} ms zu früh`,
-  insync: 'Der Lautsprecher ist synchron (±3 ms)',
+  fits: (d) => `✓ Passt – Abweichung ${d > 0 ? '+' : ''}${d} ms (Toleranz ±5 ms)`,
+  keep: (n) => `Der Feinabgleich von <b>${n > 0 ? '+' : ''}${n} ms</b> bleibt.`,
+  confirm: 'Wert bestätigen & speichern',
+  confirmed: (n, s) => `Bestätigt: ${n > 0 ? '+' : ''}${n} ms${s ? ' – gespeichert.' : ' – Speichern hat nicht geklappt.'}`,
   suggest: (n) => `Neuer Feinabgleich: <b>${n > 0 ? '+' : ''}${n} ms</b>`,
   qual: (a, b) => `Signalqualität: Referenz ${a.toFixed(1)} · Lautsprecher ${b.toFixed(1)} (gut: Referenz über 4, Lautsprecher über 8)`,
   bad: 'Messung unsicher – lauter abspielen, Gerät näher oder Umgebung ruhiger und nochmal messen.',
@@ -206,7 +208,9 @@ const T = DE ? {
   lvPh: 'Misst – Referenz und Lautsprecher rauschen abwechselnd …',
   lvLouder: (d) => `Der Lautsprecher ist ${d.toFixed(1)} dB lauter`,
   lvQuieter: (d) => `Der Lautsprecher ist ${d.toFixed(1)} dB leiser`,
-  lvEqual: 'Beide sind gleich laut (±0,5 dB)',
+  lvFits: (d) => `✓ Passt – Unterschied ${fmtDb(d)} (Toleranz ±1 dB)`,
+  lvKeep: (n) => `Die Anpassung von <b>${fmtDb(n)}</b> bleibt.`,
+  lvConfirmed: (n, s) => `Bestätigt: ${fmtDb(n)}${s ? ' – gespeichert.' : ' – Speichern hat nicht geklappt.'}`,
   lvSuggest: (n) => `Neue Anpassung: <b>${fmtDb(n)}</b>`,
   lvBoost: (d, v) => `Lauter geht nicht: Der Lautsprecher spielt schon unverändert (0 dB)` + (v !== null && v < 100 ? ` und steht selbst auf ${v} %. Option „Lautsprecher-Lautstärke bei AirPlay“ erhöhen.` : `. Den Referenz-Lautsprecher in iOS um etwa ${d.toFixed(0)} dB leiser stellen.`),
   lvQual: (snr) => `Signalabstand: ${snr.toFixed(0)} dB (gut: über 12)`,
@@ -225,12 +229,11 @@ const T = DE ? {
   step2: '2 · Prepare',
   i1: 'Play the click track here or download it:', download: 'Download',
   play: '▶ Play', pause: '■ Stop',
-  playHint: 'First set the device\'s audio output to the AirPlay group (iPhone/iPad: Control Center, Mac: menu bar › Sound). On a Mac the page can play and measure at the same time. On iPhone and iPad, iOS stops AirPlay as soon as the microphone is on – play it on a second device there.',
-  iosHint: 'On iPhone and iPad, iOS stops AirPlay playback as soon as the microphone is on. So play the track on a second device: open this page on a Mac or iPad and tap ▶ Play there (or play the file in the Music app). Then tap Measure here.',
+  playHint: 'First set the device\'s audio output to the AirPlay group (iPhone/iPad: Control Center, Mac: menu bar › Sound). If playback stops while measuring (the page tells you), play the track on a second device.',
   interrupted: 'AirPlay playback was interrupted during the measurement – probably by the microphone. Play the track on another device or with the Music app and measure again.',
   i2: 'It plays via AirPlay to a group of this speaker and a reference (HomePod/Sonos).',
   i3: 'Put the device showing this page roughly the same distance from both speakers; keep quiet.',
-  i4: 'Set both speakers to roughly the same volume and tap Measure. If nothing is playing yet, the page starts the click track itself and stops it afterwards (not on iPhone/iPad, see above).',
+  i4: 'Set both speakers to roughly the same volume and tap Measure. If nothing is playing yet, the page starts the click track itself and stops it afterwards.',
   step3: '3 · Measure (about 20 s)', start: 'Measure',
   phA: 'Phase 1/2: speaker muted – only the reference clicks …',
   phB: 'Phase 2/2: speaker back on – both click …',
@@ -238,7 +241,10 @@ const T = DE ? {
   result: 'Result',
   late: (d) => `The speaker is ${d} ms late`,
   early: (d) => `The speaker is ${d} ms early`,
-  insync: 'The speaker is in sync (±3 ms)',
+  fits: (d) => `✓ Good – off by ${d > 0 ? '+' : ''}${d} ms (tolerance ±5 ms)`,
+  keep: (n) => `The fine offset of <b>${n > 0 ? '+' : ''}${n} ms</b> stays.`,
+  confirm: 'Confirm & save value',
+  confirmed: (n, s) => `Confirmed: ${n > 0 ? '+' : ''}${n} ms${s ? ' – saved.' : ' – saving failed.'}`,
   suggest: (n) => `New fine offset: <b>${n > 0 ? '+' : ''}${n} ms</b>`,
   qual: (a, b) => `Signal quality: reference ${a.toFixed(1)} · speaker ${b.toFixed(1)} (good: reference above 4, speaker above 8)`,
   bad: 'Measurement uncertain – play louder, move closer or reduce noise and measure again.',
@@ -262,7 +268,9 @@ const T = DE ? {
   lvPh: 'Measuring – reference and speaker play noise alternately …',
   lvLouder: (d) => `The speaker is ${d.toFixed(1)} dB louder`,
   lvQuieter: (d) => `The speaker is ${d.toFixed(1)} dB quieter`,
-  lvEqual: 'Both are equally loud (±0.5 dB)',
+  lvFits: (d) => `✓ Good – difference ${fmtDb(d)} (tolerance ±1 dB)`,
+  lvKeep: (n) => `The trim of <b>${fmtDb(n)}</b> stays.`,
+  lvConfirmed: (n, s) => `Confirmed: ${fmtDb(n)}${s ? ' – saved.' : ' – saving failed.'}`,
   lvSuggest: (n) => `New trim: <b>${fmtDb(n)}</b>`,
   lvBoost: (d, v) => `Can't go louder: the speaker already plays unchanged (0 dB)` + (v !== null && v < 100 ? ` and is itself at ${v} %. Raise the option "Speaker volume during AirPlay".` : `. Turn the reference speaker down by about ${d.toFixed(0)} dB in iOS.`),
   lvQual: (snr) => `Signal-to-noise: ${snr.toFixed(0)} dB (good: above 12)`,
@@ -317,16 +325,10 @@ document.querySelectorAll('button.play').forEach(b => b.onclick = async () => {
 document.querySelectorAll('audio').forEach(a => { a.onplay = a.onpause = playLabels; });
 // Start the right track for a measurement, unless something else already
 // plays on the speaker (e.g. the Music app or a second device).
-const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
-  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 async function ensureTrack(z, audioId, phaseEl) {
   const a = $(audioId), others = [...document.querySelectorAll('audio')].filter(o => o !== a);
   const pagePlays = !a.paused || others.some(o => !o.paused);
   if (z.playing && !pagePlays) return { ok: true, started: false };
-  if (IOS) {                   // iOS ends AirPlay as soon as the mic is on
-    document.querySelectorAll('audio').forEach(o => o.pause()); playLabels();
-    return { ok: false, started: false, ios: true };
-  }
   others.forEach(o => o.pause());
   let started = false;
   if (a.paused) {
@@ -358,6 +360,8 @@ async function stillPlaying(index) {
 refresh(); setInterval(refresh, 2000);
 
 // ---------- Measurement ----------
+const TOL_MS = 5;       // within ±5 ms the offset counts as fitting
+const TOL_DB = 1.0;     // within ±1 dB the volume counts as fitting
 const BINS = 1000;      // 1 ms resolution over the 1 s click period
 const ONSET_WIN = 40;   // ms before the maximum: direct sound comes before reflections
 const ONSET_REL = 0.3;  // onset = first crossing of 30 % of the peak
@@ -409,7 +413,7 @@ async function measure() {
   $('start').disabled = true;
   const track = await ensureTrack(z, 'clickAudio', $('phase'));
   $('start').disabled = false;
-  if (!track.ok) { if (track.ios) $('phase').textContent = T.iosHint; else alert(T.notPlaying); return; }
+  if (!track.ok) { alert(T.notPlaying); return; }
   GUARD_S = z.lead_ms / 1000 + 1.0;          // bridge delay + safety margin
   PHASE_S = Math.max(9.0, GUARD_S + 6.5);    // at least ~6 clicks per phase
   let stream;
@@ -452,12 +456,14 @@ async function measure() {
   const r = analyse(x, sr, markA, markB, end);
   $('phase').textContent = '';
   const good = r.qa > 4 && r.qd > 8;
-  suggested = z.offset_ms - r.delay;
-  $('resBig').textContent = Math.abs(r.delay) <= 3 ? T.insync : (r.delay > 0 ? T.late(r.delay) : T.early(-r.delay));
+  const fits = good && Math.abs(r.delay) <= TOL_MS;
+  suggested = fits ? z.offset_ms : z.offset_ms - r.delay;
+  $('resBig').textContent = fits ? T.fits(r.delay) : (r.delay > 0 ? T.late(r.delay) : T.early(-r.delay));
   $('resBig').className = 'big ' + (good ? 'ok' : 'warn');
-  $('resText').innerHTML = T.suggest(suggested);
+  $('resText').innerHTML = fits ? T.keep(suggested) : T.suggest(suggested);
   $('resQual').textContent = T.qual(r.qa, r.qd) + (good ? '' : ' — ' + T.bad);
-  $('apply').disabled = !good || Math.abs(r.delay) <= 3;
+  $('apply').textContent = fits ? T.confirm : T.apply;
+  $('apply').disabled = !good;
   $('result').hidden = false;
 }
 
@@ -518,7 +524,7 @@ async function measureLevel() {
   $('lvStart').disabled = true;
   const track = await ensureTrack(z, 'levelAudio', $('lvPhase'));
   $('lvStart').disabled = false;
-  if (!track.ok) { if (track.ios) $('lvPhase').textContent = T.iosHint; else alert(T.notPlaying); return; }
+  if (!track.ok) { alert(T.notPlaying); return; }
   const guard = z.lead_ms / 1000 + 1.0 + LV_CYCLE;       // bridge delay + one full cycle
   const meas = 4 * LV_CYCLE;
   let stream;
@@ -562,14 +568,18 @@ async function measureLevel() {
     $('lvText').textContent = ''; $('lvQual').textContent = T.lvBad;
     $('lvApply').disabled = true; lvSuggested = null; return;
   }
-  const d = r.diff;
-  $('lvBig').textContent = Math.abs(d) <= 0.5 ? T.lvEqual : (d > 0 ? T.lvLouder(d) : T.lvQuieter(-d));
-  $('lvBig').className = 'big ' + (good ? 'ok' : 'warn');
+  const d = Math.round(r.diff * 10) / 10;
   const want = Math.round((z.trim_db - d) * 10) / 10;
-  lvSuggested = Math.max(-30, Math.min(0, want));
-  $('lvText').innerHTML = T.lvSuggest(lvSuggested) + (want > 0.5 ? '<br><span class="warn">' + T.lvBoost(want, z.speaker_volume) + '</span>' : '');
+  // "fits" also when the speaker is a little too quiet but can't go louder
+  const fits = good && (Math.abs(d) <= TOL_DB || (z.trim_db >= 0 && d < 0 && d >= -TOL_DB));
+  lvSuggested = fits ? z.trim_db : Math.max(-30, Math.min(0, want));
+  $('lvBig').textContent = fits ? T.lvFits(d) : (d > 0 ? T.lvLouder(d) : T.lvQuieter(-d));
+  $('lvBig').className = 'big ' + (good ? 'ok' : 'warn');
+  $('lvText').innerHTML = (fits ? T.lvKeep(lvSuggested) : T.lvSuggest(lvSuggested)) +
+    (!fits && want > TOL_DB ? '<br><span class="warn">' + T.lvBoost(want, z.speaker_volume) + '</span>' : '');
   $('lvQual').textContent = T.lvQual(r.snr) + (good ? '' : ' — ' + T.lvBad);
-  $('lvApply').disabled = !good || Math.abs(lvSuggested - z.trim_db) < 0.5;
+  $('lvApply').textContent = fits ? T.confirm : T.apply;
+  $('lvApply').disabled = !good;
 }
 
 async function setTrim(value, save) {
@@ -581,8 +591,9 @@ $('lvStart').onclick = measureLevel;
 $('lvAgain').onclick = measureLevel;
 $('lvApply').onclick = async () => {
   if (lvSuggested === null) return;
+  const keep = lvSuggested === zone()?.trim_db;
   const j = await setTrim(lvSuggested, true);
-  if (j) $('lvApplied').textContent = T.lvApplied(j.trim_db, j.saved);
+  if (j) $('lvApplied').textContent = keep ? T.lvConfirmed(j.trim_db, j.saved) : T.lvApplied(j.trim_db, j.saved);
 };
 document.querySelectorAll('[data-trim]').forEach(b => b.onclick = async () => {
   const z = zone(); if (!z) return;
@@ -599,8 +610,9 @@ $('start').onclick = measure;
 $('again').onclick = measure;
 $('apply').onclick = async () => {
   if (suggested === null) return;
+  const keep = suggested === zone()?.offset_ms;
   const j = await setOffset(Math.max(-1000, Math.min(1000, suggested)), true);
-  if (j) $('applied').textContent = T.applied(j.offset_ms, j.saved);
+  if (j) $('applied').textContent = keep ? T.confirmed(j.offset_ms, j.saved) : T.applied(j.offset_ms, j.saved);
 };
 document.querySelectorAll('[data-step]').forEach(b => b.onclick = async () => {
   const z = zone(); if (!z) return;
