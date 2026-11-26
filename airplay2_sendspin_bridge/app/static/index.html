@@ -169,11 +169,12 @@ const T = DE ? {
   step2: '2 · Vorbereiten',
   i1: 'Klick-Track hier abspielen oder herunterladen:', download: 'Herunterladen',
   play: '▶ Abspielen', pause: '■ Stoppen',
-  playHint: 'Vorher die Audioausgabe des Geräts auf die AirPlay-Gruppe stellen (iPhone/iPad: Kontrollzentrum, Mac: Menüleiste › Ton). Auf iPhone und iPad kann das Mikrofon die AirPlay-Wiedergabe der Seite unterbrechen – dann auf einem zweiten Gerät abspielen (z. B. Mac) oder mit der Musik-App.',
+  playHint: 'Vorher die Audioausgabe des Geräts auf die AirPlay-Gruppe stellen (iPhone/iPad: Kontrollzentrum, Mac: Menüleiste › Ton). Am Mac kann die Seite gleichzeitig abspielen und messen. Auf iPhone und iPad beendet iOS AirPlay, sobald das Mikrofon an ist – dort auf einem zweiten Gerät abspielen.',
+  iosHint: 'Auf iPhone und iPad beendet iOS die AirPlay-Wiedergabe, sobald das Mikrofon an ist. Deshalb den Track auf einem zweiten Gerät abspielen: diese Seite am Mac oder iPad öffnen und dort ▶ Abspielen tippen (oder die Datei in der Musik-App abspielen). Dann hier auf Messen tippen.',
   interrupted: 'Die AirPlay-Wiedergabe wurde während der Messung unterbrochen – vermutlich durch das Mikrofon. Den Track auf einem anderen Gerät oder mit der Musik-App abspielen und nochmal messen.',
-  i2: 'Den Track per AirPlay auf die Gruppe aus dieser Zone und einem Referenz-Lautsprecher (HomePod/Sonos) abspielen, z. B. mit der Musik-App am Mac oder iPhone.',
+  i2: 'Abgespielt wird per AirPlay auf die Gruppe aus diesem Lautsprecher und einer Referenz (HomePod/Sonos).',
   i3: 'Das Gerät mit dieser Seite ungefähr gleich weit von beiden Lautsprechern entfernt hinlegen, ruhig sein.',
-  i4: 'Beide Lautsprecher etwa gleich laut einstellen und auf Messen tippen. Läuft noch nichts, startet die Seite den Klick-Track selbst und stoppt ihn danach.',
+  i4: 'Beide Lautsprecher etwa gleich laut einstellen und auf Messen tippen. Läuft noch nichts, startet die Seite den Klick-Track selbst und stoppt ihn danach (nicht auf iPhone/iPad, siehe oben).',
   step3: '3 · Messen (ca. 20 Sekunden)', start: 'Messen',
   phA: 'Phase 1/2: Lautsprecher stumm – nur der Referenz-Lautsprecher klickt …',
   phB: 'Phase 2/2: Lautsprecher wieder an – beide klicken …',
@@ -224,11 +225,12 @@ const T = DE ? {
   step2: '2 · Prepare',
   i1: 'Play the click track here or download it:', download: 'Download',
   play: '▶ Play', pause: '■ Stop',
-  playHint: 'First set the device\'s audio output to the AirPlay group (iPhone/iPad: Control Center, Mac: menu bar › Sound). On iPhone and iPad the microphone may interrupt the page\'s AirPlay playback – then play it on a second device (e.g. a Mac) or with the Music app.',
+  playHint: 'First set the device\'s audio output to the AirPlay group (iPhone/iPad: Control Center, Mac: menu bar › Sound). On a Mac the page can play and measure at the same time. On iPhone and iPad, iOS stops AirPlay as soon as the microphone is on – play it on a second device there.',
+  iosHint: 'On iPhone and iPad, iOS stops AirPlay playback as soon as the microphone is on. So play the track on a second device: open this page on a Mac or iPad and tap ▶ Play there (or play the file in the Music app). Then tap Measure here.',
   interrupted: 'AirPlay playback was interrupted during the measurement – probably by the microphone. Play the track on another device or with the Music app and measure again.',
-  i2: 'Play it via AirPlay to a group of this speaker and a reference (HomePod/Sonos), e.g. with the Music app on Mac or iPhone.',
+  i2: 'It plays via AirPlay to a group of this speaker and a reference (HomePod/Sonos).',
   i3: 'Put the device showing this page roughly the same distance from both speakers; keep quiet.',
-  i4: 'Set both speakers to roughly the same volume and tap Measure. If nothing is playing yet, the page starts the click track itself and stops it afterwards.',
+  i4: 'Set both speakers to roughly the same volume and tap Measure. If nothing is playing yet, the page starts the click track itself and stops it afterwards (not on iPhone/iPad, see above).',
   step3: '3 · Measure (about 20 s)', start: 'Measure',
   phA: 'Phase 1/2: speaker muted – only the reference clicks …',
   phB: 'Phase 2/2: speaker back on – both click …',
@@ -315,10 +317,16 @@ document.querySelectorAll('button.play').forEach(b => b.onclick = async () => {
 document.querySelectorAll('audio').forEach(a => { a.onplay = a.onpause = playLabels; });
 // Start the right track for a measurement, unless something else already
 // plays on the speaker (e.g. the Music app or a second device).
+const IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 async function ensureTrack(z, audioId, phaseEl) {
   const a = $(audioId), others = [...document.querySelectorAll('audio')].filter(o => o !== a);
   const pagePlays = !a.paused || others.some(o => !o.paused);
   if (z.playing && !pagePlays) return { ok: true, started: false };
+  if (IOS) {                   // iOS ends AirPlay as soon as the mic is on
+    document.querySelectorAll('audio').forEach(o => o.pause()); playLabels();
+    return { ok: false, started: false, ios: true };
+  }
   others.forEach(o => o.pause());
   let started = false;
   if (a.paused) {
@@ -401,7 +409,7 @@ async function measure() {
   $('start').disabled = true;
   const track = await ensureTrack(z, 'clickAudio', $('phase'));
   $('start').disabled = false;
-  if (!track.ok) { alert(T.notPlaying); return; }
+  if (!track.ok) { if (track.ios) $('phase').textContent = T.iosHint; else alert(T.notPlaying); return; }
   GUARD_S = z.lead_ms / 1000 + 1.0;          // bridge delay + safety margin
   PHASE_S = Math.max(9.0, GUARD_S + 6.5);    // at least ~6 clicks per phase
   let stream;
@@ -510,7 +518,7 @@ async function measureLevel() {
   $('lvStart').disabled = true;
   const track = await ensureTrack(z, 'levelAudio', $('lvPhase'));
   $('lvStart').disabled = false;
-  if (!track.ok) { alert(T.notPlaying); return; }
+  if (!track.ok) { if (track.ios) $('lvPhase').textContent = T.iosHint; else alert(T.notPlaying); return; }
   const guard = z.lead_ms / 1000 + 1.0 + LV_CYCLE;       // bridge delay + one full cycle
   const meas = 4 * LV_CYCLE;
   let stream;

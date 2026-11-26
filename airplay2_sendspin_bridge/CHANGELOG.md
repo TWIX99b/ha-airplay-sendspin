@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.4
+
+- iPhone/iPad: iOS ends AirPlay as soon as the microphone is on, so the page
+  no longer starts the track itself there and explains how to play it from a
+  second device instead.
+- Step 2 wording ("Zone" → "Lautsprecher") fixed.
+
 ## 0.4.3
 
 - "Measure" starts the matching track itself (click track for timing, noise
