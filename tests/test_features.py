@@ -333,6 +333,14 @@ def test_mqtt():
         (0, "latency_offset_ms", -230) in saved and (0, "volume_trim_db", -3.5) in saved,
         "mqtt: values saved",
     )
+    ext = mqtt_ha.broker_from_options(
+        {"mqtt_host": " 10.0.0.9 ", "mqtt_port": 1884, "mqtt_username": "u"}
+    )
+    check(
+        ext["host"] == "10.0.0.9" and ext["port"] == 1884 and ext["username"] == "u",
+        "mqtt: external broker from options",
+    )
+    check(mqtt_ha.broker_from_options({"mqtt_host": ""}) is None, "mqtt: empty host")
     states = dict(mqtt_ha.state_messages(zone))
     check(states["airplay_sendspin/stube_echo/offset"] == "-230", "mqtt: state topic")
 

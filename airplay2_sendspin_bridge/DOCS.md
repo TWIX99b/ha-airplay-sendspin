@@ -93,6 +93,7 @@ zones:
 | `lower_volume_during_voice` | Solange der Sprachassistent des Lautsprechers zuhört oder antwortet, bekommt er seine alte Lautstärke zurück (Standard an). |
 | `metadata` | Titel, Interpret, Album und Cover weitergeben (Standard an). |
 | `mqtt` | Entitäten in HA über MQTT (Standard an, braucht einen Broker). |
+| `mqtt_host`, `mqtt_port`, `mqtt_username`, `mqtt_password`, `mqtt_tls` | Eigener (externer) Broker, z. B. Mosquitto im LXC. `mqtt_host` leer = Broker aus HA (Mosquitto-Add-on). |
 | `zones[].satellite_entity` | Sprachassistent des Lautsprechers (`assist_satellite.*`). Leer = automatisch über `token_entity`. |
 | `zones[].partner_host` usw. | Zweiter Lautsprecher als Stereo-Paar, siehe unten. |
 
@@ -284,6 +285,7 @@ iPhone ──AirPlay 2──► shairport-sync (per speaker) ──PCM──► 
 | `lower_volume_during_voice` | While the speaker's voice assistant listens or answers, it gets its old volume back (default on). |
 | `metadata` | Pass on title, artist, album and cover (default on). |
 | `mqtt` | Entities in HA via MQTT (default on, needs a broker). |
+| `mqtt_host`, `mqtt_port`, `mqtt_username`, `mqtt_password`, `mqtt_tls` | Your own (external) broker, e.g. Mosquitto in an LXC. Empty `mqtt_host` = broker from HA (Mosquitto add-on). |
 | `zones[].satellite_entity` | The speaker's voice assistant (`assist_satellite.*`). Empty = found via `token_entity`. |
 | `zones[].partner_host` etc. | Second speaker as a stereo pair, see below. |
 

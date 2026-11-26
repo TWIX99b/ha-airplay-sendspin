@@ -52,6 +52,19 @@ configuration:
     description: >-
       Pro Lautsprecher ein Gerät in HA: AirPlay aktiv, Titel, Feinabgleich und
       Lautstärke-Anpassung. Braucht einen MQTT-Broker (z. B. Mosquitto).
+  mqtt_host:
+    name: MQTT-Broker (extern)
+    description: >-
+      IP oder Name eines eigenen Brokers, z. B. Mosquitto im LXC. Leer = den
+      Broker aus Home Assistant nehmen (Mosquitto-Add-on).
+  mqtt_port:
+    name: MQTT-Port
+  mqtt_username:
+    name: MQTT-Benutzer
+  mqtt_password:
+    name: MQTT-Passwort
+  mqtt_tls:
+    name: MQTT über TLS
   log_level:
     name: Log-Level
   zones:

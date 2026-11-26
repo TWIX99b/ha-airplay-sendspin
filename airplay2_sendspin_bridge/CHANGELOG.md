@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.2
+
+- External MQTT broker: new options `mqtt_host`, `mqtt_port`,
+  `mqtt_username`, `mqtt_password`, `mqtt_tls`. Empty `mqtt_host` = the
+  broker from Home Assistant (Mosquitto add-on), as before.
+- MQTT disconnects are logged.
+
 ## 0.5.1
 
 - Home Assistant now downloads the prebuilt image from GHCR instead of

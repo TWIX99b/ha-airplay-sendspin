@@ -6,8 +6,9 @@ Per speaker one device with:
   * number         "Feinabgleich"       – latency_offset_ms, live + saved
   * number         "Lautstärke-Anpassung" – volume_trim_db, live + saved
 
-The broker comes from the Supervisor (services: mqtt:want). Without a broker
-the bridge simply runs without entities.
+The broker is either set in the options (mqtt_host … – e.g. an external
+Mosquitto) or comes from the Supervisor (Mosquitto add-on, services:
+mqtt:want). Without a broker the bridge simply runs without entities.
 """
 
 from __future__ import annotations
@@ -47,8 +48,22 @@ def zone_key(name: str) -> str:
     return key or "speaker"
 
 
+def broker_from_options(opts: dict) -> dict | None:
+    """An external broker set in the add-on options, or None."""
+    host = (opts.get("mqtt_host") or "").strip()
+    if not host:
+        return None
+    return {
+        "host": host,
+        "port": int(opts.get("mqtt_port") or 1883),
+        "username": (opts.get("mqtt_username") or "").strip() or None,
+        "password": opts.get("mqtt_password") or None,
+        "ssl": bool(opts.get("mqtt_tls", False)),
+    }
+
+
 async def fetch_broker() -> dict | None:
-    """MQTT credentials from the Supervisor, or None."""
+    """MQTT credentials from the Supervisor (Mosquitto add-on), or None."""
     token = os.environ.get("SUPERVISOR_TOKEN")
     if not token:
         return None
@@ -160,19 +175,29 @@ def state_messages(zone) -> list[tuple[str, str]]:
 
 
 class MqttBridge:
-    def __init__(self, zones: list, save_option, version: str, lang: str) -> None:
+    def __init__(
+        self,
+        zones: list,
+        save_option,
+        version: str,
+        lang: str,
+        broker: dict | None = None,
+    ) -> None:
         self.zones = zones
         self.by_key = {zone_key(z.cfg.name): z for z in zones}
         self.save_option = save_option  # async (index, key, value) -> bool
         self.version = version
         self.lang = lang
+        self.broker = broker  # from the options; None = ask the Supervisor
         self.client = None
         self.loop: asyncio.AbstractEventLoop | None = None
 
     async def start(self) -> bool:
-        broker = await fetch_broker()
+        broker = self.broker or await fetch_broker()
         if not broker:
-            log.info("No MQTT broker in Home Assistant – no entities.")
+            log.info(
+                "No MQTT broker (set mqtt_host for an external one) – no entities."
+            )
             return False
         import paho.mqtt.client as mqtt  # in the image; optional elsewhere
 
@@ -186,6 +211,7 @@ class MqttBridge:
             client.tls_set()
         client.will_set(AVAILABILITY, "offline", qos=1, retain=True)
         client.on_connect = self._on_connect
+        client.on_disconnect = self._on_disconnect
         client.on_message = self._on_message
         client.reconnect_delay_set(2, 60)
         client.connect_async(broker["host"], int(broker.get("port", 1883)), 60)
@@ -214,6 +240,10 @@ class MqttBridge:
             + [(f"{DISCOVERY}/status", 1)]
         )
         self._announce()
+
+    def _on_disconnect(self, _client, _userdata, _flags, reason_code, _props=None):
+        if getattr(reason_code, "is_failure", False):
+            log.warning("MQTT disconnected: %s (reconnecting)", reason_code)
 
     def _on_message(self, _client, _userdata, msg) -> None:
         payload = msg.payload.decode(errors="replace").strip()

@@ -44,7 +44,7 @@ from aiosendspin.noise import (
 from aiosendspin.noise.pairing import PairingAttempt
 from ha import SatelliteWatcher, find_satellite, ha_language
 from metadata import MetadataReader, TrackInfo
-from mqtt_ha import MqttBridge
+from mqtt_ha import MqttBridge, broker_from_options
 from web import save_zone_option, start_web
 
 try:  # the package may or may not re-export these
@@ -992,6 +992,7 @@ async def main() -> None:
             save_zone_option,
             os.environ.get("ADDON_VERSION", "dev"),
             await ha_language(),
+            broker_from_options(opts),
         )
         try:
             await mqtt.start()
