@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Add-on description in English, DOCS in German and English.
+- Code cleanup: unused event logic removed, lint/format (ruff), redundant
+  `requirements.txt` removed.
+
 ## 0.2.0
 
 - First public version: icon/logo, docs, license (MIT).

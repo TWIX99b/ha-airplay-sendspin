@@ -45,11 +45,9 @@ RUN git clone --depth 1 --branch "${SPS_VERSION}" \
  && rm -rf /tmp/sps
 
 # Python bridge (aiosendspin needs Python >= 3.12; Debian trixie ships 3.13)
-COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m venv /opt/venv \
  && /opt/venv/bin/pip install --upgrade pip \
- && /opt/venv/bin/pip install "${AIOSENDSPIN_SPEC}" -r /tmp/requirements.txt \
- && rm /tmp/requirements.txt
+ && /opt/venv/bin/pip install "${AIOSENDSPIN_SPEC}"
 
 COPY app /app
 COPY rootfs /

@@ -2,7 +2,7 @@ configuration:
   ap2_ip:
     name: Eigene IP für AirPlay
     description: >-
-      Freie IP mit Präfix, z. B. 192.168.30.240/24. Hier laufen nqptp und die
+      Freie IP mit Präfix im Netz von HA, z. B. 192.168.1.240/24. Hier laufen nqptp und die
       AirPlay-Zonen, damit sie sich nicht mit Music Assistant um UDP 319/320
       streiten. Funktioniert nur, wenn HA per Kabel angeschlossen ist.
   ap2_gateway:
@@ -15,13 +15,13 @@ configuration:
     name: Puffer (ms)
     description: >-
       So viel früher gibt shairport-sync den Ton heraus und so viel später
-      spielt ihn der Echo. Höher = robuster gegen WLAN-Aussetzer.
+      spielt ihn der Lautsprecher. Höher = robuster gegen WLAN-Aussetzer.
   sendspin_port:
     name: Sendspin-Port
     description: Port des eigenen Sendspin-Servers (nicht 8927, den nutzt Music Assistant).
   idle_timeout_s:
     name: Freigabe nach (s)
-    description: Nach so vielen Sekunden ohne Ton geht der Echo zurück an Music Assistant.
+    description: Nach so vielen Sekunden ohne Ton geht der Lautsprecher zurück an Music Assistant.
   volume_range_db:
     name: AirPlay-Lautstärkebereich (dB)
     description: >-
@@ -29,13 +29,13 @@ configuration:
       Reglermitte lauter (30 passt meist zu HomePod/Sonos).
   ignore_airplay_volume:
     name: AirPlay-Lautstärke ignorieren
-    description: Immer volle Lautstärke weitergeben, geregelt wird nur am Echo.
+    description: Immer volle Lautstärke weitergeben, geregelt wird nur am Lautsprecher.
   log_level:
     name: Log-Level
   zones:
     name: Zonen
     description: >-
-      Pro Echo eine Zone: name (so erscheint er in AirPlay), host (IP des Echos),
+      Pro Lautsprecher eine Zone: name (so erscheint er in AirPlay), host (IP),
       port (echo-dot-assist: 28928), path (/sendspin), pairing_token oder
       token_entity (Entität „Sendspin pairing token“, muss aktiviert sein),
       latency_offset_ms (Feinabgleich, + = später).

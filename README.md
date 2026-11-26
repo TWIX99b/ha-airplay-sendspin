@@ -71,7 +71,7 @@ Or: Settings → Add-ons → Add-on Store → ⋮ → Repositories →
 `https://github.com/TWIX99b/ha-airplay-sendspin`
 
 Configuration and sync tuning: see
-[DOCS.md](airplay2_sendspin_bridge/DOCS.md) (German).
+[DOCS.md](airplay2_sendspin_bridge/DOCS.md).
 
 ### How it works
 
