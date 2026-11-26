@@ -173,7 +173,7 @@ const T = DE ? {
   interrupted: 'Die AirPlay-Wiedergabe wurde während der Messung unterbrochen – vermutlich durch das Mikrofon. Den Track auf einem anderen Gerät oder mit der Musik-App abspielen und nochmal messen.',
   i2: 'Den Track per AirPlay auf die Gruppe aus dieser Zone und einem Referenz-Lautsprecher (HomePod/Sonos) abspielen, z. B. mit der Musik-App am Mac oder iPhone.',
   i3: 'Das Gerät mit dieser Seite ungefähr gleich weit von beiden Lautsprechern entfernt hinlegen, ruhig sein.',
-  i4: 'Beide Lautsprecher etwa gleich laut einstellen. Wenn oben „spielt über AirPlay“ steht, auf Messen tippen.',
+  i4: 'Beide Lautsprecher etwa gleich laut einstellen und auf Messen tippen. Läuft noch nichts, startet die Seite den Klick-Track selbst und stoppt ihn danach.',
   step3: '3 · Messen (ca. 20 Sekunden)', start: 'Messen',
   phA: 'Phase 1/2: Lautsprecher stumm – nur der Referenz-Lautsprecher klickt …',
   phB: 'Phase 2/2: Lautsprecher wieder an – beide klicken …',
@@ -190,7 +190,8 @@ const T = DE ? {
   manual: 'Von Hand nachjustieren',
   manualHint: 'Wirkt sofort beim Abspielen. Plus = Lautsprecher später, minus = früher.',
   save: 'Speichern',
-  notPlaying: 'Der Lautsprecher spielt gerade nicht über AirPlay – erst den Klick-Track starten.',
+  notPlaying: 'Der Lautsprecher hat nach 20 Sekunden noch nichts über AirPlay bekommen. Ist die Audioausgabe des Geräts auf die AirPlay-Gruppe gestellt?',
+  starting: 'Starte den Track und warte auf den Lautsprecher …',
   micErr: 'Mikrofon nicht verfügbar: ',
   lvTitle: 'Lautstärke angleichen',
   lvSub: 'Misst, wie laut der Lautsprecher im Vergleich zur Referenz ist, und gleicht ihn an. Vorher die Zeit einmessen.',
@@ -199,7 +200,7 @@ const T = DE ? {
   l1: 'Rausch-Track hier abspielen oder herunterladen:', lvDownload: 'Herunterladen',
   l2: 'Per AirPlay auf dieselbe Gruppe aus Lautsprecher und Referenz abspielen, in normaler Hörlautstärke.',
   l3: 'In iOS die beiden Lautsprecher in der Gruppe auf dieselbe Einzel-Lautstärke stellen.',
-  l4: 'Gerät wieder in die Mitte legen, ruhig sein. Abwechselnd rauscht erst die Referenz, dann der Lautsprecher.',
+  l4: 'Gerät wieder in die Mitte legen, ruhig sein, auf Messen tippen. Die Seite startet den Rausch-Track selbst. Abwechselnd rauscht erst die Referenz, dann der Lautsprecher.',
   lvMeasure: '2 · Messen (ca. 30 Sekunden)',
   lvPh: 'Misst – Referenz und Lautsprecher rauschen abwechselnd …',
   lvLouder: (d) => `Der Lautsprecher ist ${d.toFixed(1)} dB lauter`,
@@ -227,7 +228,7 @@ const T = DE ? {
   interrupted: 'AirPlay playback was interrupted during the measurement – probably by the microphone. Play the track on another device or with the Music app and measure again.',
   i2: 'Play it via AirPlay to a group of this speaker and a reference (HomePod/Sonos), e.g. with the Music app on Mac or iPhone.',
   i3: 'Put the device showing this page roughly the same distance from both speakers; keep quiet.',
-  i4: 'Set both speakers to roughly the same volume. When the status above says "playing via AirPlay", tap Measure.',
+  i4: 'Set both speakers to roughly the same volume and tap Measure. If nothing is playing yet, the page starts the click track itself and stops it afterwards.',
   step3: '3 · Measure (about 20 s)', start: 'Measure',
   phA: 'Phase 1/2: speaker muted – only the reference clicks …',
   phB: 'Phase 2/2: speaker back on – both click …',
@@ -244,7 +245,8 @@ const T = DE ? {
   manual: 'Adjust manually',
   manualHint: 'Takes effect immediately while playing. Plus = speaker later, minus = earlier.',
   save: 'Save',
-  notPlaying: 'The speaker is not playing via AirPlay – start the click track first.',
+  notPlaying: 'The speaker has not received anything via AirPlay after 20 seconds. Is the device\'s audio output set to the AirPlay group?',
+  starting: 'Starting the track and waiting for the speaker …',
   micErr: 'Microphone not available: ',
   lvTitle: 'Match volume',
   lvSub: 'Measures how loud the speaker is compared to the reference and matches it. Calibrate the timing first.',
@@ -253,7 +255,7 @@ const T = DE ? {
   l1: 'Play the noise track here or download it:', lvDownload: 'Download',
   l2: 'Play it via AirPlay to the same group of speaker and reference, at normal listening volume.',
   l3: 'In iOS, set both speakers in the group to the same individual volume.',
-  l4: 'Put the device in between again and keep quiet. The reference and the speaker play noise alternately.',
+  l4: 'Put the device in between again, keep quiet and tap Measure. The page starts the noise track itself. The reference and the speaker play noise alternately.',
   lvMeasure: '2 · Measure (about 30 s)',
   lvPh: 'Measuring – reference and speaker play noise alternately …',
   lvLouder: (d) => `The speaker is ${d.toFixed(1)} dB louder`,
@@ -311,6 +313,36 @@ document.querySelectorAll('button.play').forEach(b => b.onclick = async () => {
   playLabels();
 });
 document.querySelectorAll('audio').forEach(a => { a.onplay = a.onpause = playLabels; });
+// Start the right track for a measurement, unless something else already
+// plays on the speaker (e.g. the Music app or a second device).
+async function ensureTrack(z, audioId, phaseEl) {
+  const a = $(audioId), others = [...document.querySelectorAll('audio')].filter(o => o !== a);
+  const pagePlays = !a.paused || others.some(o => !o.paused);
+  if (z.playing && !pagePlays) return { ok: true, started: false };
+  others.forEach(o => o.pause());
+  let started = false;
+  if (a.paused) {
+    a.currentTime = 0;
+    try { await a.play(); started = true; } catch (e) { alert(e.message); return { ok: false, started: false }; }
+  }
+  playLabels();
+  phaseEl.textContent = T.starting;
+  if (z.playing) {             // track switched within a running session:
+    await sleep(3000);         // let the old track drain out of the AirPlay buffers
+    return { ok: true, started };
+  }
+  for (let i = 0; i < 40; i++) {
+    await sleep(500);
+    if (await stillPlaying(z.index)) { await sleep(1500); return { ok: true, started }; }
+  }
+  if (started) { a.pause(); playLabels(); }
+  phaseEl.textContent = '';
+  return { ok: false, started: false };
+}
+function stopTrack(audioId, started) {
+  if (!started) return;
+  const a = $(audioId); a.pause(); a.currentTime = 0; playLabels();
+}
 async function stillPlaying(index) {
   try { const zs = await (await api('api/zones')).json(); return zs.find(z => z.index === index)?.playing; }
   catch (e) { return true; }
@@ -365,14 +397,18 @@ function analyse(x, sr, markA, markB, end) {
 async function measure() {
   const z = zone();
   $('result').hidden = true; $('applied').textContent = '';
-  if (!z || !z.playing) { alert(T.notPlaying); return; }
+  if (!z) return;
+  $('start').disabled = true;
+  const track = await ensureTrack(z, 'clickAudio', $('phase'));
+  $('start').disabled = false;
+  if (!track.ok) { alert(T.notPlaying); return; }
   GUARD_S = z.lead_ms / 1000 + 1.0;          // bridge delay + safety margin
   PHASE_S = Math.max(9.0, GUARD_S + 6.5);    // at least ~6 clicks per phase
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: {
       echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-  } catch (e) { alert(T.micErr + e.message); return; }
+  } catch (e) { stopTrack('clickAudio', track.started); alert(T.micErr + e.message); return; }
   $('start').disabled = true;
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   await ctx.resume();
@@ -384,7 +420,7 @@ async function measure() {
 
   const total = 2 * PHASE_S * 1000, t0 = performance.now();
   const tick = setInterval(() => { $('prog').style.width = Math.min(100, (performance.now() - t0) / total * 100) + '%'; }, 200);
-  let markA = 0, markB = 0, end = 0;
+  let markA = 0, markB = 0, end = 0, alive = true;
   try {
     $('phase').textContent = T.phA;
     await api(`api/zones/${z.index}/mute`, { mute: true }); markA = count;
@@ -393,8 +429,10 @@ async function measure() {
     await api(`api/zones/${z.index}/mute`, { mute: false }); markB = count;
     await sleep(PHASE_S * 1000);
     end = count;
+    alive = await stillPlaying(z.index);
   } finally {
     await api(`api/zones/${z.index}/mute`, { mute: false });
+    stopTrack('clickAudio', track.started);
     clearInterval(tick); proc.disconnect(); src.disconnect();
     stream.getTracks().forEach(t => t.stop()); await ctx.close();
     $('start').disabled = false;
@@ -402,7 +440,7 @@ async function measure() {
   $('phase').textContent = T.analyse;
   const x = new Float32Array(end); let o = 0;
   for (const c of chunks) { if (o >= end) break; x.set(c.subarray(0, Math.min(c.length, end - o)), o); o += c.length; }
-  if (!(await stillPlaying(z.index))) { $('phase').textContent = T.interrupted; return; }
+  if (!alive) { $('phase').textContent = T.interrupted; return; }
   const r = analyse(x, sr, markA, markB, end);
   $('phase').textContent = '';
   const good = r.qa > 4 && r.qd > 8;
@@ -468,14 +506,18 @@ function analyseLevel(x, sr, from, end) {
 async function measureLevel() {
   const z = zone();
   $('lvResult').hidden = true; $('lvApplied').textContent = '';
-  if (!z || !z.playing) { alert(T.notPlaying); return; }
+  if (!z) return;
+  $('lvStart').disabled = true;
+  const track = await ensureTrack(z, 'levelAudio', $('lvPhase'));
+  $('lvStart').disabled = false;
+  if (!track.ok) { alert(T.notPlaying); return; }
   const guard = z.lead_ms / 1000 + 1.0 + LV_CYCLE;       // bridge delay + one full cycle
   const meas = 4 * LV_CYCLE;
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: {
       echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-  } catch (e) { alert(T.micErr + e.message); return; }
+  } catch (e) { stopTrack('levelAudio', track.started); alert(T.micErr + e.message); return; }
   $('lvStart').disabled = true;
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   await ctx.resume();
@@ -486,21 +528,23 @@ async function measureLevel() {
   src.connect(proc); proc.connect(ctx.destination);
   const total = (guard + meas) * 1000, t0 = performance.now();
   const tick = setInterval(() => { $('lvProg').style.width = Math.min(100, (performance.now() - t0) / total * 100) + '%'; }, 200);
-  let from = 0, end = 0;
+  let from = 0, end = 0, alive = true;
   try {
     $('lvPhase').textContent = T.lvPh;
     await api(`api/zones/${z.index}/level`, { on: true });
     await sleep(guard * 1000); from = count;
     await sleep(meas * 1000); end = count;
+    alive = await stillPlaying(z.index);
   } finally {
     await api(`api/zones/${z.index}/level`, { on: false });
+    stopTrack('levelAudio', track.started);
     clearInterval(tick); proc.disconnect(); src.disconnect();
     stream.getTracks().forEach(t => t.stop()); await ctx.close();
     $('lvStart').disabled = false;
   }
   const x = new Float32Array(end); let o = 0;
   for (const c of chunks) { if (o >= end) break; x.set(c.subarray(0, Math.min(c.length, end - o)), o); o += c.length; }
-  if (!(await stillPlaying(z.index))) { $('lvPhase').textContent = T.interrupted; return; }
+  if (!alive) { $('lvPhase').textContent = T.interrupted; return; }
   const r = analyseLevel(x, sr, from, end);
   $('lvPhase').textContent = '';
   const good = r.ok && r.snr >= 12;

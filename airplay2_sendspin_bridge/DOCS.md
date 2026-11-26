@@ -97,9 +97,10 @@ Das Add-on hat eine eigene Seite **„AirPlay Sync“** in der HA-Seitenleiste
 bzw. unter „Web-UI öffnen“. Dort misst es per Mikrofon den Versatz eines
 Lautsprechers gegenüber einem HomePod oder einer Sonos und stellt ihn automatisch ein.
 
-1. Die Audioausgabe auf die AirPlay-Gruppe stellen und den **Klick-Track**
-   direkt auf der Seite mit **▶ Abspielen** starten (oder `sync-click.wav`
-   herunterladen und z. B. in der Musik-App abspielen).
+1. Die Audioausgabe des Geräts auf die AirPlay-Gruppe stellen. Den
+   **Klick-Track** startet die Seite beim Messen selbst (oder vorher mit
+   **▶ Abspielen**; alternativ `sync-click.wav` herunterladen und z. B. in
+   der Musik-App abspielen).
 2. Abgespielt wird per AirPlay auf die Gruppe aus **Lautsprecher + Referenz (HomePod/Sonos)**
    abspielen, z. B. mit der Musik-App am Mac oder iPhone.
 3. Das Gerät mit der Seite **ungefähr gleich weit von beiden** Lautsprechern
@@ -130,8 +131,9 @@ Hinweise:
 Auf derselben Seite gibt es darunter **„Lautstärke angleichen“**. Vorher die
 Zeit einmessen.
 
-1. Den **Rausch-Track** (`level-noise.wav`) auf der Seite abspielen oder
-   herunterladen, per AirPlay auf dieselbe Gruppe, in normaler Hörlautstärke.
+1. Der **Rausch-Track** (`level-noise.wav`) läuft beim Messen automatisch
+   über die Seite (oder herunterladen und selbst abspielen), per AirPlay auf
+   dieselbe Gruppe, in normaler Hörlautstärke.
 2. In iOS beide Lautsprecher der Gruppe auf **dieselbe Einzel-Lautstärke**
    stellen. Gerät in die Mitte legen, **Messen** (etwa 30 Sekunden).
 3. Der Track rauscht 1,5 s und ist dann 3,5 s still. Während des Rauschens
@@ -240,9 +242,10 @@ The add-on has its own page **"AirPlay Sync"** in the HA sidebar or via
 "Open Web UI". It uses the microphone to measure a speaker's offset against a
 HomePod or Sonos and sets it automatically.
 
-1. Set the audio output to the AirPlay group and start the **click track**
-   right on the page with **▶ Play** (or download `sync-click.wav` and play
-   it e.g. in the Music app).
+1. Set the device's audio output to the AirPlay group. The page starts the
+   **click track** itself when measuring (or start it with **▶ Play**;
+   alternatively download `sync-click.wav` and play it e.g. in the Music
+   app).
 2. It plays via AirPlay to the group **speaker + reference (HomePod/Sonos)**, e.g. with
    the Music app on Mac or iPhone.
 3. Put the device showing the page **roughly the same distance from both**
@@ -271,8 +274,9 @@ Notes:
 Further down on the same page is **"Match volume"**. Calibrate the timing
 first.
 
-1. Play the **noise track** (`level-noise.wav`) on the page or download it,
-   via AirPlay to the same group, at normal listening volume.
+1. The **noise track** (`level-noise.wav`) plays automatically from the page
+   when measuring (or download it and play it yourself), via AirPlay to the
+   same group, at normal listening volume.
 2. In iOS, set both speakers of the group to the **same individual volume**.
    Put the device in between, tap **Measure** (about 30 seconds).
 3. The track plays 1.5 s of noise, then 3.5 s of silence. During the noise

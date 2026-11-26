@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.3
+
+- "Measure" starts the matching track itself (click track for timing, noise
+  track for volume), waits until the speaker receives it via AirPlay, and
+  stops it afterwards. If something already plays on the speaker (Music app,
+  second device), the page leaves it alone. Switching between the tracks
+  waits for the old one to drain from the AirPlay buffers.
+
 ## 0.4.2
 
 - The click and noise tracks can be played directly on the "AirPlay Sync"
