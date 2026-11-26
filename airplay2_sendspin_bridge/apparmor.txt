@@ -1,0 +1,49 @@
+#include <tunables/global>
+
+# AppArmor profile of the AirPlay 2 → Sendspin Bridge add-on.
+#
+# The add-on needs a lot by nature: its own network namespace (ip netns,
+# macvlan), avahi, dbus, nqptp on UDP 319/320 and raw PCM pipes. So the file
+# and capability rules are broad and only keep it within the container; the
+# deny rules below block the usual ways out to the host (kernel memory,
+# firmware, security fs, sysrq), as Docker's default profile does.
+
+profile airplay2_sendspin_bridge flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  capability,
+  network,
+  unix,
+  dbus,
+  signal,
+  ptrace (read, readby),
+
+  # ip netns add/exec: bind mounts under /run/netns, sysfs in the namespace
+  mount,
+  umount,
+
+  # s6-overlay, cont-init scripts, services, venv
+  file,
+  /init ix,
+  /{usr/,}{bin,sbin}/** ix,
+  /usr/local/{bin,sbin}/** ix,
+  /usr/lib/** ix,
+  /usr/libexec/** ix,
+  /command/** ix,
+  /package/** ix,
+  /run/** rwix,
+  /etc/cont-init.d/** rwix,
+  /etc/services.d/** rwix,
+  /opt/venv/** rix,
+  /app/** r,
+  /data/** rwk,
+  /tmp/** rwk,
+
+  # never: kernel memory, firmware, security fs, sysrq
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/kcore rwklx,
+  deny /dev/mem rwklx,
+  deny /dev/kmem rwklx,
+  deny /sys/firmware/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+}

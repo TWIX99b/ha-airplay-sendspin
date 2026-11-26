@@ -36,6 +36,22 @@ configuration:
       Auf diesen Wert stellt das Add-on den Lautsprecher selbst, solange AirPlay
       spielt; danach kommt der alte Wert zurück. Geregelt wird dann über
       AirPlay. 0 = Lautsprecher-Lautstärke nicht anfassen.
+  lower_volume_during_voice:
+    name: Leiser bei Sprachassistent
+    description: >-
+      Solange der Sprachassistent des Lautsprechers zuhört oder antwortet,
+      bekommt er seine alte Lautstärke zurück, damit die Antwort nicht mit
+      AirPlay-Lautstärke kommt. Findet den Satelliten über token_entity.
+  metadata:
+    name: Titel und Cover weitergeben
+    description: >-
+      Titel, Interpret, Album und Cover aus AirPlay an den Lautsprecher (Geräte
+      mit Bildschirm) und an Home Assistant.
+  mqtt:
+    name: Entitäten über MQTT
+    description: >-
+      Pro Lautsprecher ein Gerät in HA: AirPlay aktiv, Titel, Feinabgleich und
+      Lautstärke-Anpassung. Braucht einen MQTT-Broker (z. B. Mosquitto).
   log_level:
     name: Log-Level
   zones:
@@ -45,4 +61,7 @@ configuration:
       port (echo-dot-assist: 28928), path (/sendspin), pairing_token oder
       token_entity (Entität „Sendspin pairing token“, muss aktiviert sein),
       latency_offset_ms (Feinabgleich, + = später), volume_trim_db
-      (Lautstärke-Anpassung, 0 bis −30 dB).
+      (Lautstärke-Anpassung, 0 bis −30 dB). Optional satellite_entity
+      (assist_satellite.*, sonst automatisch). Stereo-Paar: partner_host (+
+      partner_port, partner_path, partner_pairing_token oder
+      partner_token_entity) – dann spielt host links, partner_host rechts.

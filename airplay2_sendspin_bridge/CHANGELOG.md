@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.5.0
+
+- **Voice assistant:** while the speaker's voice assistant listens or
+  answers, it gets its old volume back (instead of the 100 % used for
+  AirPlay), and goes up again 2 s after. The satellite is found via
+  `token_entity` (or `satellite_entity`). Option `lower_volume_during_voice`.
+- **Title and cover:** shairport-sync metadata (title, artist, album, cover)
+  is passed to the speaker via Sendspin; Echos with a screen show it. Option
+  `metadata`.
+- **Stereo pair:** `partner_host` (+ `partner_port`, `partner_path`,
+  `partner_pairing_token` / `partner_token_entity`): two speakers as one
+  AirPlay receiver, left and right, with the same play time.
+- **Home Assistant entities via MQTT:** per speaker a device with "AirPlay"
+  (playing), "Titel" (track), "Feinabgleich" and "Lautstärke-Anpassung"
+  (editable, live + saved). Option `mqtt`, needs a broker.
+- **AppArmor:** own profile instead of `apparmor: false`.
+- **CI:** GitHub Actions runs lint and all tests and builds images for
+  amd64/aarch64 on GHCR.
+- tests/test_features.py: stereo pair, track info, voice assistant and MQTT
+  with simulated speakers.
+
 ## 0.4.5
 
 - Tolerance: a timing result within ±5 ms (volume within ±1 dB) is shown as

@@ -32,6 +32,22 @@ configuration:
       The add-on sets the speaker itself to this value while AirPlay plays and
       restores the old value afterwards; loudness is then controlled via
       AirPlay. 0 = don't touch the speaker volume.
+  lower_volume_during_voice:
+    name: Quieter for the voice assistant
+    description: >-
+      While the speaker's voice assistant listens or answers, the speaker gets
+      its old volume back, so the reply doesn't come at AirPlay volume. Finds
+      the satellite via token_entity.
+  metadata:
+    name: Pass on title and cover
+    description: >-
+      Title, artist, album and cover from AirPlay to the speaker (models with a
+      screen) and to Home Assistant.
+  mqtt:
+    name: Entities via MQTT
+    description: >-
+      One device per speaker in HA: AirPlay active, title, sync offset and
+      volume trim. Needs an MQTT broker (e.g. Mosquitto).
   log_level:
     name: Log level
   zones:
@@ -41,3 +57,7 @@ configuration:
       (echo-dot-assist: 28928), path (/sendspin), pairing_token or token_entity
       (entity "Sendspin pairing token", must be enabled), latency_offset_ms
       (fine tuning, + = later), volume_trim_db (volume trim, 0 to −30 dB).
+      Optional satellite_entity (assist_satellite.*, otherwise automatic).
+      Stereo pair: partner_host (+ partner_port, partner_path,
+      partner_pairing_token or partner_token_entity) – then host plays left,
+      partner_host right.

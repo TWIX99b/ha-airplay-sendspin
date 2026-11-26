@@ -59,10 +59,17 @@ jobs:
           new Function(h.split('<script>')[1].split('</script>')[0]);
           console.log('js ok');"
 
-      - name: Calibration tests
+      - name: AppArmor profile
+        run: |
+          sudo apt-get install -y apparmor >/dev/null
+          sudo apparmor_parser --skip-kernel-load --skip-cache "$ADDON_DIR/apparmor.txt"
+          echo "apparmor ok"
+
+      - name: Tests
         run: |
           python tests/test_calibration.py
           python tests/test_volume_matching.py
+          python tests/test_features.py
 
   init:
     name: Prepare build

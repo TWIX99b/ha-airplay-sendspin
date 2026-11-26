@@ -90,6 +90,11 @@ zones:
 | `zones[].pairing_token` / `token_entity` | Token direkt eintragen **oder** aus einer HA-Entität lesen. |
 | `zones[].latency_offset_ms` | Feinabgleich pro Lautsprecher: + = später, − = früher. |
 | `zones[].volume_trim_db` | Lautstärke-Anpassung pro Lautsprecher, 0 bis −30 dB. Wird per Einmessung gesetzt. |
+| `lower_volume_during_voice` | Solange der Sprachassistent des Lautsprechers zuhört oder antwortet, bekommt er seine alte Lautstärke zurück (Standard an). |
+| `metadata` | Titel, Interpret, Album und Cover weitergeben (Standard an). |
+| `mqtt` | Entitäten in HA über MQTT (Standard an, braucht einen Broker). |
+| `zones[].satellite_entity` | Sprachassistent des Lautsprechers (`assist_satellite.*`). Leer = automatisch über `token_entity`. |
+| `zones[].partner_host` usw. | Zweiter Lautsprecher als Stereo-Paar, siehe unten. |
 
 ### Automatisch einmessen
 
@@ -150,6 +155,42 @@ Lauter als 0 dB geht nicht. Ist der Lautsprecher dann immer noch leiser, zuerst
 iOS etwas leiser stellen. Gleich laut heißt nicht gleicher Klang: Ein Echo
 hat weniger Bass als eine Sonos.
 
+### Sprachassistent, Titel, Stereo-Paar, HA-Entitäten
+
+**Sprachassistent:** Bei AirPlay steht der Echo auf `speaker_volume`
+(100 %). Hört F.R.I.D.A.Y. zu oder antwortet, stellt das Add-on ihn auf seine
+alte Lautstärke zurück, damit die Antwort nicht in AirPlay-Lautstärke kommt.
+Zwei Sekunden nach dem Ende geht es wieder hoch. Die Musik senkt der Echo
+dabei selbst ab (echo-dot-assist, Einstellung „Music ducking“). Den
+Satelliten findet das Add-on über `token_entity`.
+
+**Titel und Cover:** Titel, Interpret, Album und Cover aus AirPlay gehen an
+den Lautsprecher. Echos mit Bildschirm (z. B. Show 8) zeigen sie an.
+
+**Stereo-Paar:** Zwei Lautsprecher als ein AirPlay-Lautsprecher, links und
+rechts. `host` spielt links, `partner_host` rechts:
+
+```yaml
+zones:
+  - name: Stube
+    host: 192.168.1.50
+    port: 28928
+    token_entity: sensor.stube_links_sendspin_pairing_token
+    partner_host: 192.168.1.51
+    partner_token_entity: sensor.stube_rechts_sendspin_pairing_token
+    latency_offset_ms: -225
+```
+
+Beide bekommen dieselbe Spielzeit, der Feinabgleich gilt für beide. Fällt
+einer aus, spielt der andere weiter.
+
+**Entitäten in HA (MQTT):** Mit einem MQTT-Broker (z. B. Mosquitto)
+erscheint pro Lautsprecher ein Gerät „<Name> AirPlay“ mit:
+- **AirPlay**: spielt gerade über AirPlay (an/aus), z. B. für Automationen
+- **Titel**: aktueller Titel, Interpret und Album als Attribute
+- **Feinabgleich** und **Lautstärke-Anpassung**: änderbar, wirken sofort
+  und werden gespeichert
+
 ### Messwerte (Info)
 
 Gemessene bzw. abgehörte Werte als Orientierung. Die Einmessung ersetzt sie,
@@ -172,8 +213,10 @@ denn die Lautstärke hängt auch von Raum und Referenz ab. Weitere Werte gern pe
 - Beim Dazuschalten oder Wegnehmen von Lautsprechern baut iOS die Sitzung
   neu auf. Ein kurzer Aussetzer ist dann normal.
 - Die Sicherheitsbewertung in HA ist niedrig, weil das Add-on das
-  Host-Netzwerk, `NET_ADMIN`/`SYS_ADMIN` und kein AppArmor braucht. Das ist
-  für die eigene IP per macvlan nötig.
+  Host-Netzwerk und `NET_ADMIN`/`SYS_ADMIN` braucht. Das ist für die eigene
+  IP per macvlan nötig. Seit 0.5.0 hat es ein eigenes AppArmor-Profil; es ist
+  bewusst großzügig, sperrt aber den Zugriff auf Kernel-Speicher, Firmware
+  und Sicherheits-Dateisysteme des Hosts.
 
 ---
 
@@ -238,6 +281,11 @@ iPhone ──AirPlay 2──► shairport-sync (per speaker) ──PCM──► 
 | `zones[].pairing_token` / `token_entity` | Enter the token directly **or** read it from an HA entity. |
 | `zones[].latency_offset_ms` | Per-speaker fine tuning: + = later, − = earlier. |
 | `zones[].volume_trim_db` | Per-speaker volume trim, 0 to −30 dB. Set by the calibration. |
+| `lower_volume_during_voice` | While the speaker's voice assistant listens or answers, it gets its old volume back (default on). |
+| `metadata` | Pass on title, artist, album and cover (default on). |
+| `mqtt` | Entities in HA via MQTT (default on, needs a broker). |
+| `zones[].satellite_entity` | The speaker's voice assistant (`assist_satellite.*`). Empty = found via `token_entity`. |
+| `zones[].partner_host` etc. | Second speaker as a stereo pair, see below. |
 
 ### Automatic calibration
 
@@ -294,6 +342,42 @@ Above 0 dB is not possible. If the speaker is still quieter, check
 down a little in iOS. Equally loud doesn't mean equal sound: an Echo has less
 bass than a Sonos.
 
+### Voice assistant, track info, stereo pair, HA entities
+
+**Voice assistant:** During AirPlay the Echo is at `speaker_volume` (100 %).
+While its voice assistant listens or answers, the add-on sets it back to its
+old volume, so the reply doesn't come at AirPlay volume. Two seconds after it
+is done, it goes back up. The Echo lowers the music itself meanwhile
+(echo-dot-assist, setting "Music ducking"). The add-on finds the satellite
+via `token_entity`.
+
+**Title and cover:** Title, artist, album and cover from AirPlay go to the
+speaker. Echos with a screen (e.g. Show 8) show them.
+
+**Stereo pair:** Two speakers as one AirPlay speaker, left and right. `host`
+plays left, `partner_host` right:
+
+```yaml
+zones:
+  - name: Living room
+    host: 192.168.1.50
+    port: 28928
+    token_entity: sensor.living_left_sendspin_pairing_token
+    partner_host: 192.168.1.51
+    partner_token_entity: sensor.living_right_sendspin_pairing_token
+    latency_offset_ms: -225
+```
+
+Both get the same play time; the fine offset applies to both. If one fails,
+the other plays on.
+
+**Entities in HA (MQTT):** With an MQTT broker (e.g. Mosquitto) each speaker
+gets a device "<name> AirPlay" with:
+- **AirPlay**: currently playing via AirPlay (on/off), e.g. for automations
+- **Now playing**: current title, artist and album as attributes
+- **Sync offset** and **Volume trim**: editable, take effect immediately and
+  are saved
+
 ### Measured values (info)
 
 Measured or by-ear values as a starting point. The calibration replaces
@@ -314,9 +398,11 @@ them, since volume also depends on the room and the reference. Feel free to repo
 - When AirPlay pauses, the speaker stays taken for `idle_timeout_s` seconds.
 - iOS rebuilds the session when speakers are added or removed from a group.
   A short dropout is normal then.
-- HA's security rating is low because the add-on needs host networking,
-  `NET_ADMIN`/`SYS_ADMIN` and no AppArmor. That is required for the
-  dedicated IP via macvlan.
+- HA's security rating is low because the add-on needs host networking and
+  `NET_ADMIN`/`SYS_ADMIN`. That is required for the dedicated IP via macvlan.
+  Since 0.5.0 it has its own AppArmor profile; it is deliberately broad but
+  blocks access to the host's kernel memory, firmware and security file
+  systems.
 
 ---
 

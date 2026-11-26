@@ -1,12 +1,14 @@
 """AirPlay 2 → Sendspin bridge.
 
-For every configured zone:
+For every configured zone (= one AirPlay receiver):
   * starts a shairport-sync instance (AirPlay 2, output to stdout) inside the
     network namespace ``ap2``,
   * reads the raw PCM (48 kHz, S16_LE, stereo),
   * stamps each chunk with a play time in the Sendspin server clock and
-    pushes it with aiosendspin to the Sendspin player (e.g. an Echo with
-    echo-dot-assist).
+    pushes it with aiosendspin to one Sendspin player (e.g. an Echo with
+    echo-dot-assist), or to two as a stereo pair (left/right),
+  * passes title, artist, album and cover on (speakers with a screen),
+  * turns the speaker back down while its voice assistant is active.
 
 Sync with HomePods works like this: shairport-sync hands each sample out
 ``latency_ms`` EARLY (negative ``audio_backend_latency_offset_in_seconds``),
@@ -19,13 +21,15 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hashlib
+import io
 import json
 import logging
 import os
 import signal
 import time
 from array import array
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import aiohttp
@@ -38,7 +42,10 @@ from aiosendspin.noise import (
     decode_psk_token,
 )
 from aiosendspin.noise.pairing import PairingAttempt
-from web import start_web
+from ha import SatelliteWatcher, find_satellite, ha_language
+from metadata import MetadataReader, TrackInfo
+from mqtt_ha import MqttBridge
+from web import save_zone_option, start_web
 
 try:  # the package may or may not re-export these
     from aiosendspin.server import SendspinServer
@@ -54,6 +61,7 @@ ZONE_DIR = DATA_DIR / "zones"
 IDENTITY_FILE = DATA_DIR / "sendspin_identity.key"
 PAIRING_FILE = DATA_DIR / "sendspin_pairings.json"
 NETNS_FILE = Path("/run/ap2/netns_exec")
+META_DIR = Path("/tmp/ap2-meta")
 
 SAMPLE_RATE = 48_000
 CHANNELS = 2
@@ -78,27 +86,44 @@ LEVEL_PEAK_SILENT = 100  # chunk peak below this (≈ −50 dBFS) counts as sile
 LEVEL_INJECT_FROM = 25  # chunks (0.5 s) into the silence …
 LEVEL_INJECT_TO = 125  # … until 2.5 s
 LEVEL_BUF_MAX = 150  # keep at most 3 s of noise
+# Voice assistant: back to the old volume while it listens/thinks/talks,
+# and only up again once it has been idle for a moment (follow-up questions).
+VOICE_IDLE_HOLD_S = 2.0
 PCM_FORMAT = AudioFormat(sample_rate=SAMPLE_RATE, bit_depth=16, channels=CHANNELS)
 
 log = logging.getLogger("bridge")
 
 
 @dataclass
-class ZoneConfig:
-    index: int
-    name: str
+class SpeakerConfig:
+    """One Sendspin speaker. A zone has one, or two as a stereo pair."""
+
+    label: str
     host: str
     port: int
     path: str
     pairing_token: str
     token_entity: str
-    latency_offset_ms: int
-    volume_trim_db: float = 0.0
+    channel: str = "stereo"  # stereo | left | right
+    satellite_entity: str = ""
 
     @property
     def url(self) -> str:
         path = self.path if self.path.startswith("/") else f"/{self.path}"
         return f"ws://{self.host}:{self.port}{path}"
+
+
+@dataclass
+class ZoneConfig:
+    index: int
+    name: str
+    speakers: list[SpeakerConfig]
+    latency_offset_ms: int
+    volume_trim_db: float = 0.0
+
+    @property
+    def host(self) -> str:
+        return " + ".join(s.host for s in self.speakers)
 
     @property
     def slug(self) -> str:
@@ -179,13 +204,39 @@ def apply_gain(pcm: bytes, gain: float) -> bytes:
     return array("h", [int(v * gain) for v in samples]).tobytes()
 
 
+def pick_channel(pcm: bytes, channel: int) -> bytes:
+    """Stereo S16 → the chosen channel on both sides (stereo pair)."""
+    samples = array("h")
+    samples.frombytes(pcm)
+    one = samples[channel::2]
+    out = array("h", bytes(len(pcm)))
+    out[0::2] = one
+    out[1::2] = one
+    return out.tobytes()
+
+
+def cover_image(data: bytes | None):
+    """Cover bytes → PIL image (or None)."""
+    if not data:
+        return None
+    try:
+        from PIL import Image  # comes with aiosendspin
+
+        return Image.open(io.BytesIO(data)).convert("RGB")
+    except Exception as err:  # noqa: BLE001
+        log.debug("cover not readable: %s", err)
+        return None
+
+
 def player_role(client):
     """The Sendspin player role of a client (volume control), if any."""
     roles = client.roles_by_family("player") if client is not None else []
     return roles[0] if roles else None
 
 
-def write_shairport_config(zone: ZoneConfig, latency_ms: int, opts: dict) -> Path:
+def write_shairport_config(
+    zone: ZoneConfig, latency_ms: int, opts: dict, meta_pipe: Path | None = None
+) -> Path:
     # shairport-sync hands out audio exactly latency_ms early; the bridge
     # plays it latency_ms (+ the zone's fine offset) later.
     offset_s = -latency_ms / 1000.0
@@ -211,6 +262,15 @@ sessioncontrol = {{
 stdout = {{
   output_rate = {SAMPLE_RATE};
   output_format = "S16_LE";
+}};
+"""
+    if meta_pipe is not None:
+        conf += f"""metadata = {{
+  enabled = "yes";
+  include_cover_art = "yes";
+  cover_art_cache_directory = "";
+  pipe_name = "{meta_pipe}";
+  pipe_timeout = 5000;
 }};
 """
     ZONE_DIR.mkdir(parents=True, exist_ok=True)
@@ -257,20 +317,20 @@ class SendspinSide:
                 getattr(event, "goodbye_reason", "?"),
             )
 
-    async def ensure_paired(self, zone: ZoneConfig, token_str: str) -> str | None:
+    async def ensure_paired(self, zone: SpeakerConfig, token_str: str) -> str | None:
         """Pair once with the token. Returns the client ID."""
         assert self.server and self.store
         try:
             token = decode_psk_token(token_str)
         except Exception as err:  # noqa: BLE001
-            log.error("[%s] pairing token unreadable: %s", zone.name, err)
+            log.error("[%s] pairing token unreadable: %s", zone.label, err)
             return None
         client_id = token.client_id
         if await self.store.record_by_client_id(client_id):
-            log.info("[%s] already paired (%s…)", zone.name, client_id[:12])
+            log.info("[%s] already paired (%s…)", zone.label, client_id[:12])
             return client_id
 
-        log.info("[%s] pairing with %s …", zone.name, zone.url)
+        log.info("[%s] pairing with %s …", zone.label, zone.url)
         attempt = PairingAttempt(
             method=PairMethod.PAIRING_PSK,
             pairing_psk=token.pairing_psk,
@@ -288,17 +348,17 @@ class SendspinSide:
                     break
                 await asyncio.sleep(0.5)
         except Exception as err:  # noqa: BLE001
-            log.error("[%s] pairing failed: %s", zone.name, err)
+            log.error("[%s] pairing failed: %s", zone.label, err)
         finally:
             self.server.disconnect_from_client(zone.url)
 
         if await self.store.record_by_client_id(client_id):
-            log.info("[%s] paired.", zone.name)
+            log.info("[%s] paired.", zone.label)
             return client_id
-        log.error("[%s] no pairing record after the attempt.", zone.name)
+        log.error("[%s] no pairing record after the attempt.", zone.label)
         return None
 
-    async def acquire(self, zone: ZoneConfig, client_id: str):
+    async def acquire(self, zone: SpeakerConfig, client_id: str):
         """Take the Echo over for playback and return (client, group)."""
         assert self.server
         await self.server.connect_to_client_and_wait(
@@ -312,13 +372,13 @@ class SendspinSide:
             client = self.server.get_client(client_id)
             if client is not None and client.is_connected:
                 log.info(
-                    "[%s] Echo ready after %.2f s", zone.name, loop.time() - started
+                    "[%s] Echo ready after %.2f s", zone.label, loop.time() - started
                 )
                 return client, client.group
             await asyncio.sleep(0.1)
         raise RuntimeError("Echo did not report ready within 10 s")
 
-    def release(self, zone: ZoneConfig) -> None:
+    def release(self, zone: SpeakerConfig) -> None:
         """Hand the Echo back so Music Assistant can take it again."""
         if self.server:
             self.server.disconnect_from_client(zone.url)
@@ -329,6 +389,20 @@ class SendspinSide:
 # --------------------------------------------------------------------------
 
 
+@dataclass
+class Link:
+    """Runtime state of one speaker of a zone."""
+
+    cfg: SpeakerConfig
+    client_id: str | None = None
+    group: object = None
+    stream: object = None
+    player: object = None
+    volume_before: int | None = None  # set when we turned it up for AirPlay
+    lowered: bool = False  # back at volume_before for the voice assistant
+    restore_task: asyncio.Task | None = field(default=None, repr=False)
+
+
 class Zone:
     def __init__(self, cfg: ZoneConfig, side: SendspinSide, opts: dict) -> None:
         self.cfg = cfg
@@ -337,7 +411,8 @@ class Zone:
         self.latency_ms = int(opts["latency_ms"])
         self.idle_timeout = float(opts["idle_timeout_s"])
         self.netns_exec = NETNS_FILE.read_text().split() if NETNS_FILE.exists() else []
-        self.client_id: str | None = None
+        self.links = [Link(s) for s in cfg.speakers]
+        self.active: list[Link] = []
         self.log = logging.getLogger(f"zone.{cfg.slug}")
         # Calibration (web UI): status and live intervention
         self.streaming = False
@@ -348,20 +423,39 @@ class Zone:
         self._lvl_silent = 0
         # Speaker volume while AirPlay plays (0 = leave it alone)
         self.speaker_volume = int(opts.get("speaker_volume", 100))
-        self.player = None
-        self._volume_before: int | None = None
+        self.lower_for_voice = bool(opts.get("lower_volume_during_voice", True))
+        # Track info from shairport-sync
+        self.use_metadata = bool(opts.get("metadata", True))
+        self.track: TrackInfo | None = None
+        self._cover_sent: bytes | None = None
+        self._listeners: list[Callable[[Zone], None]] = []
+
+    # --- listeners (MQTT) ----------------------------------------------------
+    def add_listener(self, callback: Callable[[Zone], None]) -> None:
+        self._listeners.append(callback)
+
+    def _notify(self) -> None:
+        for callback in self._listeners:
+            try:
+                callback(self)
+            except Exception:  # noqa: BLE001
+                self.log.exception("listener failed")
 
     @property
     def echo_volume(self) -> int | None:
-        """Current volume of the speaker itself (only while playing)."""
-        if not self.streaming or self.player is None:
+        """Current volume of the (first) speaker itself (only while playing)."""
+        if not self.streaming:
             return None
-        return self.player.volume
+        for link in self.active:
+            if link.player is not None:
+                return link.player.volume
+        return None
 
     def set_trim(self, trim_db: float) -> None:
         """Change the volume trim immediately."""
         self.cfg.volume_trim_db = round(float(trim_db), 1)
         self.log.info("volume_trim_db is now %+.1f dB", self.cfg.volume_trim_db)
+        self._notify()
 
     def set_level_mode(self, on: bool) -> None:  # noqa: FBT001
         self.level_mode = on
@@ -383,44 +477,140 @@ class Zone:
             return self._lvl_buf[k % len(self._lvl_buf)]
         return pcm
 
-    def _take_volume(self) -> None:
+    # --- speaker volume ------------------------------------------------------
+    def _take_volume(self, link: Link) -> None:
         """Set the speaker to speaker_volume for AirPlay, remember the old value."""
-        self._volume_before = None
+        link.volume_before = None
+        link.lowered = False
         target = self.speaker_volume
-        player = self.player
+        player = link.player
         if target <= 0 or player is None:
             return
         if PlayerCommand.VOLUME not in player.state_supported_commands:
-            self.log.warning("Speaker does not accept volume commands")
+            self.log.warning("[%s] does not accept volume commands", link.cfg.label)
             return
         before = player.volume
         if before != target:
             player.set_volume(target)
-            self._volume_before = before
-            self.log.info("Speaker volume %d → %d for AirPlay", before, target)
+            link.volume_before = before
+            self.log.info(
+                "[%s] volume %d → %d for AirPlay", link.cfg.label, before, target
+            )
 
-    async def _give_volume_back(self) -> None:
+    async def _give_volume_back(self, link: Link) -> None:
         """Restore the old speaker volume, unless someone changed it meanwhile."""
-        before, self._volume_before = self._volume_before, None
-        player = self.player
-        if before is None or player is None:
-            return
+        if link.restore_task is not None:
+            link.restore_task.cancel()
+            link.restore_task = None
+        before, link.volume_before = link.volume_before, None
+        lowered, link.lowered = link.lowered, False
+        player = link.player
+        if before is None or player is None or lowered:
+            return  # nothing raised, or already back for the voice assistant
         if abs(player.volume - self.speaker_volume) > 1:
             self.log.info(
-                "Speaker volume was changed during AirPlay (%d), keeping it",
+                "[%s] volume was changed during AirPlay (%d), keeping it",
+                link.cfg.label,
                 player.volume,
             )
             return
         with contextlib.suppress(Exception):
             player.set_volume(before)
-            self.log.info("Speaker volume back to %d", before)
+            self.log.info("[%s] volume back to %d", link.cfg.label, before)
             await asyncio.sleep(0.3)  # let the command go out before disconnecting
 
+    def on_satellite(self, entity_id: str, state: str) -> None:
+        """Voice assistant of one of our speakers changed state."""
+        if not self.lower_for_voice or not self.streaming:
+            return
+        for link in self.active:
+            if link.cfg.satellite_entity != entity_id or link.player is None:
+                continue
+            if link.volume_before is None:
+                continue  # we did not turn it up, nothing to undo
+            if state != "idle":
+                if link.restore_task is not None:
+                    link.restore_task.cancel()
+                    link.restore_task = None
+                if not link.lowered:
+                    link.lowered = True
+                    with contextlib.suppress(Exception):
+                        link.player.set_volume(link.volume_before)
+                    self.log.info(
+                        "[%s] voice assistant %s → volume %d",
+                        link.cfg.label,
+                        state,
+                        link.volume_before,
+                    )
+            elif link.lowered and link.restore_task is None:
+                link.restore_task = asyncio.ensure_future(self._raise_again(link))
+
+    async def _raise_again(self, link: Link) -> None:
+        try:
+            await asyncio.sleep(VOICE_IDLE_HOLD_S)
+            if link.lowered and self.streaming and link.player is not None:
+                link.lowered = False
+                link.player.set_volume(self.speaker_volume)
+                self.log.info(
+                    "[%s] voice assistant idle → volume %d",
+                    link.cfg.label,
+                    self.speaker_volume,
+                )
+        except asyncio.CancelledError:
+            pass
+        finally:
+            if link.restore_task is asyncio.current_task():
+                link.restore_task = None
+
+    # --- track info ------------------------------------------------------------
+    def on_track(self, info: TrackInfo | None) -> None:
+        if info is not None and info.empty:
+            info = None
+        if info == self.track:
+            return
+        self.track = info
+        if info is not None:
+            self.log.info("Now playing: %s – %s", info.artist, info.title)
+        if self.streaming:
+            asyncio.ensure_future(self._push_track(self.active))
+        self._notify()
+
+    async def _push_track(self, links: list[Link]) -> None:
+        """Send title/artist/album and, if it changed, the cover."""
+        track = self.track
+        cover = track.cover if track else None
+        new_cover = cover != self._cover_sent
+        self._cover_sent = cover
+        image = cover_image(cover) if new_cover else None
+        for link in links:
+            group = link.group
+            if group is None:
+                continue
+            try:
+                meta = group.group_role("metadata")
+                if meta is not None:
+                    if track is None:
+                        meta.clear()
+                    else:
+                        meta.update(
+                            title=track.title or None,
+                            artist=track.artist or None,
+                            album=track.album or None,
+                            album_artist=track.album_artist or None,
+                        )
+                art = group.group_role("artwork")
+                if art is not None and new_cover:
+                    await art.set_album_artwork(image)
+            except Exception as err:  # noqa: BLE001
+                self.log.debug("[%s] track info not sent: %s", link.cfg.label, err)
+
+    # --- offset ----------------------------------------------------------------
     def set_offset(self, offset_ms: int) -> None:
         """Change the fine offset immediately (takes effect at once)."""
         self.cfg.latency_offset_ms = int(offset_ms)
         self._force_resync = True
         self.log.info("latency_offset_ms is now %+d ms", offset_ms)
+        self._notify()
 
     def lead_ms(self) -> int:
         """Delay from the bridge to the speaker (for the calibration page)."""
@@ -437,22 +627,54 @@ class Zone:
             self.latency_ms + int(SPS_BUFFER_S * 1000) + self.cfg.latency_offset_ms
         ) * 1000
 
-    async def run(self) -> None:
-        token = self.cfg.pairing_token or await fetch_token_from_ha(
-            self.cfg.token_entity
+    # --- lifecycle -------------------------------------------------------------
+    async def prepare(self) -> None:
+        """Resolve the voice satellites (before the HA watcher starts)."""
+        for link in self.links:
+            if not link.cfg.satellite_entity and link.cfg.token_entity:
+                link.cfg.satellite_entity = await find_satellite(link.cfg.token_entity)
+            if link.cfg.satellite_entity:
+                self.log.info(
+                    "[%s] voice satellite: %s",
+                    link.cfg.label,
+                    link.cfg.satellite_entity,
+                )
+
+    async def _pair(self, link: Link) -> None:
+        token = link.cfg.pairing_token or await fetch_token_from_ha(
+            link.cfg.token_entity
         )
         if not token:
             self.log.error(
-                "No pairing token. Set pairing_token or token_entity "
-                "(entity 'Sendspin pairing token' of the Echo, it must be enabled)."
+                "[%s] no pairing token. Set pairing_token or token_entity "
+                "(entity 'Sendspin pairing token' of the Echo, it must be enabled).",
+                link.cfg.label,
             )
             return
-        while self.client_id is None:
-            self.client_id = await self.side.ensure_paired(self.cfg, token)
-            if self.client_id is None:
+        while link.client_id is None:
+            link.client_id = await self.side.ensure_paired(link.cfg, token)
+            if link.client_id is None:
                 await asyncio.sleep(60)
 
-        conf = write_shairport_config(self.cfg, self.latency_ms, self.opts)
+    async def run(self) -> None:
+        pairing = [asyncio.create_task(self._pair(link)) for link in self.links]
+        # Start AirPlay as soon as one speaker is paired; the others follow.
+        while not any(link.client_id for link in self.links):
+            if all(t.done() for t in pairing):
+                self.log.error("No speaker of this zone could be paired.")
+                return
+            await asyncio.sleep(0.5)
+
+        meta_pipe = None
+        if self.use_metadata:
+            META_DIR.mkdir(parents=True, exist_ok=True)
+            meta_pipe = META_DIR / f"{self.cfg.slug}.pipe"
+            reader = MetadataReader(
+                meta_pipe, asyncio.get_running_loop(), self.on_track
+            )
+            reader.ensure_fifo()
+            reader.start()
+        conf = write_shairport_config(self.cfg, self.latency_ms, self.opts, meta_pipe)
         backoff = 2.0
         while True:
             started = asyncio.get_running_loop().time()
@@ -538,21 +760,49 @@ class Zone:
             queue.put_nowait(None)  # leave the end marker for _pump_audio
         return item
 
-    async def _session(self, queue: asyncio.Queue, first: tuple[int, bytes]) -> None:
-        assert self.client_id
-        self.log.info("AirPlay playback started → taking over %s", self.cfg.host)
+    async def _acquire(self, link: Link) -> bool:
         try:
-            client, group = await self.side.acquire(self.cfg, self.client_id)
+            client, group = await self.side.acquire(link.cfg, link.client_id)
         except Exception as err:  # noqa: BLE001
-            self.log.error("Could not take over the Echo: %s", err)
+            self.log.error("[%s] could not take over: %s", link.cfg.label, err)
+            return False
+        link.group = group
+        link.player = player_role(client)
+        return True
+
+    async def _release(self, link: Link) -> None:
+        with contextlib.suppress(Exception):
+            await link.group.stop()
+        await self._give_volume_back(link)
+        link.group = link.stream = link.player = None
+        self.side.release(link.cfg)
+
+    def _pcm_for(self, link: Link, pcm: bytes) -> bytes:
+        if link.cfg.channel == "left":
+            return pick_channel(pcm, 0)
+        if link.cfg.channel == "right":
+            return pick_channel(pcm, 1)
+        return pcm
+
+    async def _session(self, queue: asyncio.Queue, first: tuple[int, bytes]) -> None:
+        ready = [link for link in self.links if link.client_id]
+        self.log.info("AirPlay playback started → taking over %s", self.cfg.host)
+        results = await asyncio.gather(*(self._acquire(link) for link in ready))
+        active = [link for link, ok in zip(ready, results, strict=True) if ok]
+        if not active:
             while await self._next(queue) is not None:
                 pass  # throw away until the pause
             return
 
-        self.player = player_role(client)
-        self._take_volume()
-        stream = group.start_stream()
+        for link in active:
+            self._take_volume(link)
+            link.stream = link.group.start_stream()
+        self.active = active
         self.streaming = True
+        self._cover_sent = None
+        asyncio.ensure_future(self._push_track(active))
+        self._notify()
+        clock = active[0].stream
         next_ts: int | None = None
         err_avg = 0.0
         sent = resyncs = dropped = 0
@@ -560,7 +810,7 @@ class Zone:
         last_report = loop.time()
         item: tuple[int, bytes] | None = first
         try:
-            while item is not None:
+            while item is not None and self.active:
                 # Gather what is already waiting (up to MAX_BATCH chunks)
                 arrival, pcm = item
                 parts = [pcm]
@@ -572,7 +822,7 @@ class Zone:
                     parts.append(nxt[1])
 
                 # Arrival time (monotonic) → Sendspin server clock
-                now_srv = stream.now_us()
+                now_srv = clock.now_us()
                 target = arrival + (now_srv - mono_us()) + self._lead_us()
                 if self._force_resync:  # offset changed via the web UI
                     self._force_resync = False
@@ -610,8 +860,17 @@ class Zone:
                         pcm = bytes(len(pcm))
                     elif self.cfg.volume_trim_db < 0:
                         pcm = apply_gain(pcm, 10 ** (self.cfg.volume_trim_db / 20))
-                    stream.prepare_audio(pcm, PCM_FORMAT)
-                    await stream.commit_audio(play_start_us=next_ts)
+                    for link in list(self.active):
+                        try:
+                            link.stream.prepare_audio(
+                                self._pcm_for(link, pcm), PCM_FORMAT
+                            )
+                            await link.stream.commit_audio(play_start_us=next_ts)
+                        except Exception as err:  # noqa: BLE001
+                            # one speaker of a pair gone: the other plays on
+                            self.log.error("[%s] lost: %s", link.cfg.label, err)
+                            self.active.remove(link)
+                            await self._release(link)
                     next_ts += CHUNK_US * len(parts)
                     sent += len(parts)
 
@@ -627,23 +886,58 @@ class Zone:
                     last_report = loop.time()
 
                 item = await self._next(queue)
-            self.log.info("AirPlay paused/ended → releasing the Echo")
+            self.log.info("AirPlay paused/ended → releasing the speaker(s)")
         except Exception as err:  # noqa: BLE001
             self.log.exception("Streaming error: %s", err)
         finally:
             self.streaming = False
             self.cal_mute = False
             self.set_level_mode(False)
-            with contextlib.suppress(Exception):
-                await group.stop()
-            await self._give_volume_back()
-            self.player = None
-            self.side.release(self.cfg)
+            links, self.active = self.active, []
+            for link in links:
+                await self._release(link)
+            self._notify()
 
 
 # --------------------------------------------------------------------------
 # main
 # --------------------------------------------------------------------------
+
+
+def zone_config(index: int, z: dict) -> ZoneConfig:
+    name = z["name"]
+    main = SpeakerConfig(
+        label=name,
+        host=z["host"],
+        port=int(z["port"]),
+        path=z.get("path") or "/sendspin",
+        pairing_token=(z.get("pairing_token") or "").strip(),
+        token_entity=(z.get("token_entity") or "").strip(),
+        satellite_entity=(z.get("satellite_entity") or "").strip(),
+    )
+    speakers = [main]
+    if (z.get("partner_host") or "").strip():
+        main.channel = "left"
+        main.label = f"{name} L"
+        speakers.append(
+            SpeakerConfig(
+                label=f"{name} R",
+                host=z["partner_host"].strip(),
+                port=int(z.get("partner_port") or main.port),
+                path=z.get("partner_path") or main.path,
+                pairing_token=(z.get("partner_pairing_token") or "").strip(),
+                token_entity=(z.get("partner_token_entity") or "").strip(),
+                channel="right",
+                satellite_entity=(z.get("partner_satellite_entity") or "").strip(),
+            )
+        )
+    return ZoneConfig(
+        index=index,
+        name=name,
+        speakers=speakers,
+        latency_offset_ms=int(z.get("latency_offset_ms") or 0),
+        volume_trim_db=min(0.0, float(z.get("volume_trim_db") or 0)),
+    )
 
 
 async def main() -> None:
@@ -658,20 +952,9 @@ async def main() -> None:
     side = SendspinSide(loop, "AirPlay Bridge", int(opts["sendspin_port"]))
     await side.start()
 
-    zones = []
-    for i, z in enumerate(opts.get("zones", [])):
-        cfg = ZoneConfig(
-            index=i,
-            name=z["name"],
-            host=z["host"],
-            port=int(z["port"]),
-            path=z.get("path") or "/sendspin",
-            pairing_token=(z.get("pairing_token") or "").strip(),
-            token_entity=(z.get("token_entity") or "").strip(),
-            latency_offset_ms=int(z.get("latency_offset_ms") or 0),
-            volume_trim_db=min(0.0, float(z.get("volume_trim_db") or 0)),
-        )
-        zones.append(Zone(cfg, side, opts))
+    zones = [
+        Zone(zone_config(i, z), side, opts) for i, z in enumerate(opts.get("zones", []))
+    ]
     if not zones:
         log.error("No zones configured.")
         return
@@ -679,13 +962,50 @@ async def main() -> None:
     stop = asyncio.Event()
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
+
+    # Voice satellites: turn the speaker back down while the assistant is active
+    background: list[asyncio.Task] = []
+    if opts.get("lower_volume_during_voice", True):
+        await asyncio.gather(*(z.prepare() for z in zones))
+        by_entity: dict[str, Zone] = {
+            link.cfg.satellite_entity: z
+            for z in zones
+            for link in z.links
+            if link.cfg.satellite_entity
+        }
+
+        def on_satellite(entity_id: str, state: str) -> None:
+            zone = by_entity.get(entity_id)
+            if zone is not None:
+                zone.on_satellite(entity_id, state)
+
+        watcher = SatelliteWatcher(list(by_entity), on_satellite)
+        background.append(asyncio.create_task(watcher.run(), name="satellites"))
+
     tasks = [asyncio.create_task(z.run(), name=z.cfg.slug) for z in zones]
     web_runner = await start_web(zones)
+
+    mqtt = None
+    if opts.get("mqtt", True):
+        mqtt = MqttBridge(
+            zones,
+            save_zone_option,
+            os.environ.get("ADDON_VERSION", "dev"),
+            await ha_language(),
+        )
+        try:
+            await mqtt.start()
+        except Exception as err:  # noqa: BLE001
+            log.warning("MQTT not started: %s", err)
+            mqtt = None
+
     await stop.wait()
+    if mqtt is not None:
+        mqtt.stop()
     await web_runner.cleanup()
-    for t in tasks:
+    for t in tasks + background:
         t.cancel()
-    await asyncio.gather(*tasks, return_exceptions=True)
+    await asyncio.gather(*tasks, *background, return_exceptions=True)
     if side.server:
         await side.server.close()
 
