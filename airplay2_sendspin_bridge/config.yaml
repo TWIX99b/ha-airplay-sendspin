@@ -1,10 +1,11 @@
 name: AirPlay 2 → Sendspin Bridge
-version: "0.5.0"
+version: "0.5.1"
 slug: airplay2_sendspin_bridge
 description: >-
   Turns Sendspin speakers (e.g. Echos with echo-dot-assist) into real AirPlay 2
   receivers that iOS can group with HomePod and Sonos.
 url: https://github.com/TWIX99b/ha-airplay-sendspin
+image: ghcr.io/twix99b/{arch}-addon-airplay2-sendspin-bridge
 stage: experimental
 arch:
   - amd64

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- Home Assistant now downloads the prebuilt image from GHCR instead of
+  compiling shairport-sync and nqptp itself: installs and updates take
+  seconds instead of minutes.
+
 ## 0.5.0
 
 - **Voice assistant:** while the speaker's voice assistant listens or
