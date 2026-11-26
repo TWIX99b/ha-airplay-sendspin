@@ -1,0 +1,35 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+# avahi announces the AirPlay zones (_airplay._tcp / _raop._tcp) on the LAN.
+NETNS_EXEC="$(cat /run/ap2/netns_exec 2>/dev/null)"
+
+# Wait for dbus
+for _ in $(seq 1 50); do
+  [ -S /run/dbus/system_bus_socket ] && break
+  sleep 0.2
+done
+
+CONF=/etc/avahi/avahi-daemon.conf
+{
+  echo "[server]"
+  echo "host-name=airplay-bridge"
+  echo "use-ipv4=yes"
+  echo "use-ipv6=no"
+  if [ -s /run/ap2/interface ]; then
+    echo "allow-interfaces=$(cat /run/ap2/interface)"
+  fi
+  echo "ratelimit-interval-usec=1000000"
+  echo "ratelimit-burst=1000"
+  echo "[wide-area]"
+  echo "enable-wide-area=no"
+  echo "[publish]"
+  echo "publish-workstation=no"
+  echo "publish-hinfo=no"
+  echo "[reflector]"
+  echo "[rlimits]"
+} > "${CONF}"
+
+rm -f /run/avahi-daemon/pid
+bashio::log.info "Starting avahi ${NETNS_EXEC:+(in netns ap2)}"
+# shellcheck disable=SC2086
+exec ${NETNS_EXEC} avahi-daemon --no-drop-root --no-chroot -s

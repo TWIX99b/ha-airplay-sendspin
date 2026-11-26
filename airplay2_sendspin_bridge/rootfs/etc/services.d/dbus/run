@@ -1,0 +1,7 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+mkdir -p /run/dbus
+rm -f /run/dbus/pid /run/dbus/system_bus_socket
+[ -s /etc/machine-id ] || dbus-uuidgen > /etc/machine-id
+bashio::log.info "Starting dbus"
+exec dbus-daemon --system --nofork --nopidfile

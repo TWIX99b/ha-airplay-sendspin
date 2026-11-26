@@ -1,0 +1,35 @@
+configuration:
+  ap2_ip:
+    name: Dedicated AirPlay IP
+    description: >-
+      Free IP with prefix, e.g. 192.168.30.240/24. nqptp and the AirPlay zones
+      run here so they don't clash with Music Assistant on UDP 319/320.
+      Requires a wired connection.
+  ap2_gateway:
+    name: Gateway
+    description: Empty = the host's gateway.
+  ap2_interface:
+    name: Network interface
+    description: Empty = interface of the default route.
+  latency_ms:
+    name: Buffer (ms)
+    description: How early shairport-sync releases audio and how much later the speaker plays it.
+  sendspin_port:
+    name: Sendspin port
+    description: Port of the bridge's own Sendspin server (not 8927, Music Assistant uses it).
+  idle_timeout_s:
+    name: Release after (s)
+    description: Seconds without audio before the speaker is handed back to Music Assistant.
+  volume_range_db:
+    name: AirPlay volume range (dB)
+    description: Range between the quietest and loudest slider value. Smaller = louder mid-slider.
+  ignore_airplay_volume:
+    name: Ignore AirPlay volume
+    description: Always pass full volume, control loudness on the speaker only.
+  log_level:
+    name: Log level
+  zones:
+    name: Zones
+    description: >-
+      One zone per speaker: name, host, port (echo-dot-assist: 28928), path,
+      pairing_token or token_entity, latency_offset_ms.

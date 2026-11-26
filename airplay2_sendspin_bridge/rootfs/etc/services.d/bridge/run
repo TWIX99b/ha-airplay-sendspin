@@ -1,0 +1,7 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+# The bridge runs in the host network (it needs the Supervisor API and the
+# Echos) and starts shairport-sync itself inside netns ap2.
+sleep 3   # give avahi and nqptp a head start
+bashio::log.info "Starting AirPlay 2 → Sendspin bridge"
+exec /opt/venv/bin/python3 -u /app/bridge.py

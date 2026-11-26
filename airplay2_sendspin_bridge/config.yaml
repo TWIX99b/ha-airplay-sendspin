@@ -1,0 +1,49 @@
+name: AirPlay 2 → Sendspin Bridge
+version: "0.2.0"
+slug: airplay2_sendspin_bridge
+description: >-
+  Macht Sendspin-Lautsprecher (z. B. Echos mit echo-dot-assist) zu echten
+  AirPlay-2-Empfängern, die sich in iOS mit HomePods und Sonos gruppieren lassen.
+url: https://github.com/TWIX99b/ha-airplay-sendspin
+stage: experimental
+arch:
+  - amd64
+  - aarch64
+init: false
+startup: application
+boot: auto
+host_network: true
+apparmor: false
+privileged:
+  - NET_ADMIN
+  - SYS_ADMIN
+homeassistant_api: true
+options:
+  ap2_ip: ""
+  ap2_gateway: ""
+  ap2_interface: ""
+  latency_ms: 500
+  sendspin_port: 8937
+  idle_timeout_s: 4
+  volume_range_db: 30
+  ignore_airplay_volume: false
+  log_level: info
+  zones: []
+schema:
+  ap2_ip: match(^$|^\d{1,3}(\.\d{1,3}){3}/\d{1,2}$)
+  ap2_gateway: match(^$|^\d{1,3}(\.\d{1,3}){3}$)
+  ap2_interface: str?
+  latency_ms: int(150,3000)
+  sendspin_port: port
+  idle_timeout_s: int(1,60)
+  volume_range_db: int(20,90)
+  ignore_airplay_volume: bool
+  log_level: list(debug|info|warning|error)
+  zones:
+    - name: str
+      host: str
+      port: port
+      path: str?
+      pairing_token: password?
+      token_entity: str?
+      latency_offset_ms: int(-1000,1000)?

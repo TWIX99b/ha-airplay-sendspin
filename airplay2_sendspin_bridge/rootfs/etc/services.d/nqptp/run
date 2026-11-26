@@ -1,0 +1,8 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+# nqptp provides the PTP clock for AirPlay 2 (UDP 319/320). One process
+# serves all shairport-sync instances.
+NETNS_EXEC="$(cat /run/ap2/netns_exec 2>/dev/null)"
+bashio::log.info "Starting nqptp ${NETNS_EXEC:+(in netns ap2)}"
+# shellcheck disable=SC2086
+exec ${NETNS_EXEC} /usr/local/bin/nqptp
