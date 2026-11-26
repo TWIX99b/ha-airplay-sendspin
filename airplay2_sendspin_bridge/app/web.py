@@ -1,4 +1,8 @@
-"""Web UI (HA ingress) for automatic calibration.
+"""Web UI (HA ingress): speakers and automatic calibration.
+
+Speakers tab: tiles with status, track, offset and volume; add speakers
+suggested from Home Assistant (echo-dot-assist devices), edit and remove
+them. They are stored in the add-on options (speakers.py).
 
 Flow on the calibration page (in the browser):
   1. A click track (1 click per second) plays via AirPlay to the group
@@ -20,6 +24,8 @@ reachable on the LAN. Only the Supervisor ingress proxy is allowed through.
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import io
 import json
 import logging
@@ -28,12 +34,15 @@ import os
 import random
 import struct
 import tempfile
+import time
 import wave
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import aiohttp
+import speakers
 from aiohttp import web
+from ha import render_template
 
 if TYPE_CHECKING:
     from bridge import Zone
@@ -45,6 +54,7 @@ ALLOWED_PEERS = {"172.30.32.2", "127.0.0.1", "::1"}  # Supervisor ingress proxy
 STATIC = Path(__file__).parent / "static"
 OPTIONS_FILE = Path("/data/options.json")
 
+BOOT_ID = f"{time.time():.0f}-{os.getpid()}"  # changes with every (re)start
 CLICK_RATE = 48_000
 CLICK_SECONDS = 90
 
@@ -140,14 +150,16 @@ def build_level_wav() -> bytes:
     return buf.getvalue()
 
 
-async def save_zone_option(index: int, key: str, value: float) -> bool:
-    """Save one zone value permanently in the add-on options (Supervisor API)."""
+def read_options() -> dict:
+    return json.loads(OPTIONS_FILE.read_text(encoding="utf-8"))
+
+
+async def save_options(opts: dict) -> bool:
+    """Save the whole add-on options (Supervisor API)."""
     token = os.environ.get("SUPERVISOR_TOKEN")
     if not token:
         return False
     try:
-        opts = json.loads(OPTIONS_FILE.read_text(encoding="utf-8"))
-        opts["zones"][index][key] = value
         async with (
             aiohttp.ClientSession() as session,
             session.post(
@@ -158,13 +170,53 @@ async def save_zone_option(index: int, key: str, value: float) -> bool:
             ) as resp,
         ):
             if resp.status != 200:
-                log.warning("Saving the options failed: HTTP %s", resp.status)
+                log.warning(
+                    "Saving the options failed: HTTP %s %s",
+                    resp.status,
+                    (await resp.text())[:300],
+                )
                 return False
         OPTIONS_FILE.write_text(json.dumps(opts), encoding="utf-8")
         return True
-    except (OSError, KeyError, IndexError, aiohttp.ClientError, TimeoutError) as err:
+    except (OSError, aiohttp.ClientError, TimeoutError) as err:
         log.warning("Saving the options failed: %s", err)
         return False
+
+
+async def save_zone_option(index: int, key: str, value: float) -> bool:
+    """Save one zone value permanently in the add-on options."""
+    try:
+        opts = read_options()
+        opts["zones"][index][key] = value
+    except (OSError, ValueError, KeyError, IndexError) as err:
+        log.warning("Saving the options failed: %s", err)
+        return False
+    return await save_options(opts)
+
+
+async def restart_self(delay: float = 0.8) -> None:
+    """Restart the add-on (new speakers need new AirPlay receivers)."""
+    await asyncio.sleep(delay)  # let the HTTP answer go out first
+    token = os.environ.get("SUPERVISOR_TOKEN")
+    if not token:
+        return
+    log.info("Speakers changed – restarting the add-on")
+    try:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                "http://supervisor/addons/self/restart",
+                headers={"Authorization": f"Bearer {token}"},
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp,
+        ):
+            log.info("Restart requested: HTTP %s", resp.status)
+    except (aiohttp.ClientError, TimeoutError) as err:
+        log.warning("Restart failed: %s", err)
+
+
+def cover_key(cover: bytes | None) -> str | None:
+    return hashlib.sha1(cover).hexdigest()[:12] if cover else None
 
 
 def create_app(zones: list[Zone]) -> web.Application:
@@ -201,11 +253,28 @@ def create_app(zones: list[Zone]) -> web.Application:
         return web.FileResponse(level_file, headers={"Content-Type": "audio/wav"})
 
     async def list_zones(_request: web.Request) -> web.Response:
+        def track(z):
+            t = z.track
+            if t is None:
+                return None
+            return {"title": t.title, "artist": t.artist, "album": t.album}
+
         return web.json_response(
             [
                 {
                     "index": z.cfg.index,
                     "name": z.cfg.name,
+                    "speakers": [
+                        {
+                            "label": link.cfg.label,
+                            "host": link.cfg.host,
+                            "channel": link.cfg.channel,
+                            "paired": link.client_id is not None,
+                        }
+                        for link in z.links
+                    ],
+                    "track": track(z),
+                    "cover": cover_key(z.track.cover if z.track else None),
                     "offset_ms": z.cfg.latency_offset_ms,
                     "lead_ms": z.lead_ms(),
                     "trim_db": z.cfg.volume_trim_db,
@@ -258,7 +327,59 @@ def create_app(zones: list[Zone]) -> web.Application:
             saved = await save_zone_option(zone.cfg.index, "volume_trim_db", trim)
         return web.json_response({"trim_db": trim, "saved": saved})
 
+    async def cover(request: web.Request) -> web.Response:
+        zone = zone_or_404(request)
+        data = zone.track.cover if zone.track else None
+        if not data:
+            raise web.HTTPNotFound()
+        kind = "image/png" if data[:4] == b"\x89PNG" else "image/jpeg"
+        return web.Response(
+            body=data, content_type=kind, headers={"Cache-Control": "max-age=3600"}
+        )
+
+    async def get_config(_request: web.Request) -> web.Response:
+        opts = read_options()
+        return web.json_response(
+            {
+                "boot": BOOT_ID,
+                "zones": [speakers.public_zone(z) for z in opts.get("zones", [])],
+            }
+        )
+
+    async def put_config(request: web.Request) -> web.Response:
+        body = await request.json()
+        opts = read_options()
+        old = opts.get("zones", [])
+        try:
+            new = speakers.clean_all(body.get("zones"), old)
+        except (ValueError, TypeError) as err:
+            raise web.HTTPBadRequest(text=str(err)) from None
+        restart = speakers.needs_restart(old, new)
+        opts["zones"] = new
+        if not await save_options(opts):
+            raise web.HTTPBadGateway(text="saving the options failed")
+        if restart:
+            asyncio.ensure_future(restart_self())
+        else:  # only offset / trim changed: apply live
+            for zone, cfg in zip(zones, new, strict=False):
+                if zone.cfg.latency_offset_ms != cfg["latency_offset_ms"]:
+                    zone.set_offset(cfg["latency_offset_ms"])
+                if zone.cfg.volume_trim_db != cfg["volume_trim_db"]:
+                    zone.set_trim(cfg["volume_trim_db"])
+        return web.json_response({"restart": restart})
+
+    async def discover(_request: web.Request) -> web.Response:
+        rendered = await render_template(speakers.DISCOVERY_TEMPLATE)
+        if rendered is None:
+            raise web.HTTPBadGateway(text="Home Assistant not reachable")
+        found = speakers.parse_discovery(rendered, read_options().get("zones", []))
+        return web.json_response(found)
+
     app.router.add_get("/", index)
+    app.router.add_get("/api/config", get_config)
+    app.router.add_put("/api/config", put_config)
+    app.router.add_get("/api/discover", discover)
+    app.router.add_get("/api/zones/{index}/cover", cover)
     app.router.add_get("/sync-click.wav", click)
     app.router.add_get("/level-noise.wav", level_track)
     app.router.add_get("/api/zones", list_zones)

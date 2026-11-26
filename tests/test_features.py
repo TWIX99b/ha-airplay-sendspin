@@ -39,7 +39,12 @@ stub(
     WSMsgType=types.SimpleNamespace(TEXT=1),
     web=stub("aiohttp.web"),
 )
-for n in ["aiosendspin", "aiosendspin.audio", "aiosendspin.models", "aiosendspin.server"]:
+for n in [
+    "aiosendspin",
+    "aiosendspin.audio",
+    "aiosendspin.models",
+    "aiosendspin.server",
+]:
     stub(n)
 stub("aiosendspin.audio.format", AudioFormat=_Any)
 stub(
@@ -61,6 +66,7 @@ sys.modules["aiosendspin.server"].SendspinServer = _Any
 import bridge  # noqa: E402
 import metadata  # noqa: E402
 import mqtt_ha  # noqa: E402
+import speakers  # noqa: E402
 
 FAILS = []
 
@@ -178,9 +184,7 @@ def test_config():
         },
     )
     check(len(cfg.speakers) == 2, "pair: two speakers")
-    check(
-        [s.channel for s in cfg.speakers] == ["left", "right"], "pair: left + right"
-    )
+    check([s.channel for s in cfg.speakers] == ["left", "right"], "pair: left + right")
     check(cfg.speakers[1].port == 28928, "pair: partner inherits port")
     single = bridge.zone_config(1, {"name": "Bad", "host": "10.0.0.3", "port": 1})
     check(single.speakers[0].channel == "stereo", "single speaker plays stereo")
@@ -212,9 +216,7 @@ async def test_pair_session():
     await zone._session(queue, (bridge.mono_us(), stereo_chunk(111, 222)))
     a, b = side.groups["A"].stream.commits, side.groups["B"].stream.commits
     check(len(a) > 0 and len(a) == len(b), "pair: both speakers got every commit")
-    check(
-        all(x[0] == y[0] for x, y in zip(a, b, strict=True)), "pair: same play time"
-    )
+    check(all(x[0] == y[0] for x, y in zip(a, b, strict=True)), "pair: same play time")
     la, lb = array("h"), array("h")
     la.frombytes(a[0][1])
     lb.frombytes(b[0][1])
@@ -330,7 +332,8 @@ def test_mqtt():
     check(zone.cfg.latency_offset_ms == -230, "mqtt: offset set live")
     check(zone.cfg.volume_trim_db == 0.0, "mqtt: trim clamped to 0")
     check(
-        (0, "latency_offset_ms", -230) in saved and (0, "volume_trim_db", -3.5) in saved,
+        (0, "latency_offset_ms", -230) in saved
+        and (0, "volume_trim_db", -3.5) in saved,
         "mqtt: values saved",
     )
     ext = mqtt_ha.broker_from_options(
@@ -345,7 +348,88 @@ def test_mqtt():
     check(states["airplay_sendspin/stube_echo/offset"] == "-230", "mqtt: state topic")
 
 
+def test_speakers():
+    old = [
+        {
+            "name": "Stube",
+            "host": "1.1.1.1",
+            "port": 28928,
+            "path": "/sendspin",
+            "pairing_token": "SP:SECRET",
+            "latency_offset_ms": -225,
+            "volume_trim_db": 0,
+        },
+    ]
+    pub = speakers.public_zone(old[0])
+    check(
+        "pairing_token" not in pub and pub["has_pairing_token"],
+        "speakers: token hidden",
+    )
+    # page sends it back without the token → kept
+    new = speakers.clean_all([{**pub, "orig": 0, "latency_offset_ms": -230}], old)
+    check(new[0]["pairing_token"] == "SP:SECRET", "speakers: token kept")
+    check(not speakers.needs_restart(old, new), "speakers: offset only → live")
+    added = speakers.clean_all(
+        [
+            {**pub, "orig": 0},
+            {"name": "Bad", "host": "1.1.1.2", "token_entity": "sensor.x"},
+        ],
+        old,
+    )
+    check(speakers.needs_restart(old, added), "speakers: new speaker → restart")
+    for bad, why in (
+        ([{"name": "", "host": "x", "token_entity": "s"}], "no name"),
+        ([{"name": "A", "host": "", "token_entity": "s"}], "no host"),
+        ([{"name": "A", "host": "x"}], "no token"),
+        (
+            [
+                {"name": "A", "host": "x", "token_entity": "s"},
+                {"name": "a", "host": "y", "token_entity": "t"},
+            ],
+            "duplicate name",
+        ),
+        (
+            [
+                {
+                    "name": "A",
+                    "host": "x",
+                    "token_entity": "s",
+                    "partner_host": "x",
+                    "partner_token_entity": "t",
+                }
+            ],
+            "speaker twice",
+        ),
+        (
+            [
+                {
+                    "name": "A",
+                    "host": "x",
+                    "token_entity": "s",
+                    "latency_offset_ms": 5000,
+                }
+            ],
+            "offset",
+        ),
+    ):
+        try:
+            speakers.clean_all(bad, [])
+            check(False, f"speakers: rejects {why}")
+        except ValueError:
+            check(True, f"speakers: rejects {why}")
+    found = speakers.parse_discovery(
+        '[{"token_entity":"sensor.a","device":"D","model":"echo-2","area":"Bad",'
+        '"web":"http://10.0.0.7:28931","satellite":"assist_satellite.a","has_token":true}]',
+        [],
+    )
+    check(found[0]["host"] == "10.0.0.7", "discovery: IP from web UI address")
+    check(found[0]["model_name"] == "Echo 2", "discovery: model name")
+    check(found[0]["suggested_name"] == "Bad Echo", "discovery: suggested name")
+    check(speakers.parse_discovery("garbage", []) == [], "discovery: bad input")
+
+
 test_config()
+test_speakers()
 test_pick_channel()
 asyncio.run(test_pair_session())
 asyncio.run(test_voice())

@@ -57,6 +57,26 @@ iPhone ──AirPlay 2──► shairport-sync (pro Lautsprecher) ──PCM─�
    Minuten, weil shairport-sync und nqptp kompiliert werden.
 3. Konfigurieren (siehe unten) und starten.
 
+### Lautsprecher verwalten
+
+Am einfachsten über die eigene Seite des Add-ons, **„AirPlay Bridge“** in der
+HA-Seitenleiste, Reiter **Lautsprecher**:
+
+- Jeder Lautsprecher ist eine Kachel: Status (spielt / bereit / nicht
+  gekoppelt), laufender Titel mit Cover, Feinabgleich, Lautstärke.
+- **Lautsprecher hinzufügen** zeigt alle Echos mit echo-dot-assist, die
+  Home Assistant kennt, mit Raum, Modell und IP. Antippen, Namen prüfen,
+  speichern. Für bekannte Modelle schlägt das Formular den Wert aus der
+  Messwerte-Tabelle vor (z. B. Echo 2: −225 ms).
+- **Bearbeiten**: Name, Echo, Stereo-Partner, Feinabgleich, Lautstärke;
+  unter „Erweitert“ Port, Pfad, Pairing-Token und Sprachassistent.
+- Feinabgleich und Lautstärke wirken sofort. Neue, entfernte oder geänderte
+  Lautsprecher übernimmt das Add-on mit einem kurzen Neustart; die Seite
+  lädt danach von selbst neu.
+
+Die Lautsprecher stehen weiterhin auch im Tab „Konfiguration“ unter
+`zones` und lassen sich dort von Hand bearbeiten.
+
 ### Konfiguration
 
 ```yaml
@@ -99,7 +119,7 @@ zones:
 
 ### Automatisch einmessen
 
-Das Add-on hat eine eigene Seite **„AirPlay Sync“** in der HA-Seitenleiste
+Das Add-on hat eine eigene Seite **„AirPlay Bridge“** (Reiter **Einmessen**) in der HA-Seitenleiste
 bzw. unter „Web-UI öffnen“. Dort misst es per Mikrofon den Versatz eines
 Lautsprechers gegenüber einem HomePod oder einer Sonos und stellt ihn automatisch ein.
 
@@ -270,6 +290,25 @@ iPhone ──AirPlay 2──► shairport-sync (per speaker) ──PCM──► 
    minutes because shairport-sync and nqptp are compiled.
 3. Configure (see the example in the German section) and start it.
 
+### Managing speakers
+
+Easiest on the add-on's own page, **"AirPlay Bridge"** in the HA sidebar,
+tab **Speakers**:
+
+- Each speaker is a tile: status (playing / ready / not paired), current
+  track with cover, sync offset, volume.
+- **Add speaker** lists every Echo with echo-dot-assist that Home Assistant
+  knows, with room, model and IP. Tap one, check the name, save. For known
+  models the form suggests the value from the measured-values table (e.g.
+  Echo 2: −225 ms).
+- **Edit**: name, Echo, stereo partner, offset, volume; under "Advanced"
+  port, path, pairing token and voice assistant.
+- Offset and volume take effect immediately. New, removed or changed
+  speakers are applied with a short restart; the page reloads by itself.
+
+The speakers also stay in the "Configuration" tab under `zones` and can be
+edited there by hand.
+
 ### Options
 
 | Option | Meaning |
@@ -291,7 +330,7 @@ iPhone ──AirPlay 2──► shairport-sync (per speaker) ──PCM──► 
 
 ### Automatic calibration
 
-The add-on has its own page **"AirPlay Sync"** in the HA sidebar or via
+The add-on has its own page **"AirPlay Bridge"** (tab **Calibrate**) in the HA sidebar or via
 "Open Web UI". It uses the microphone to measure a speaker's offset against a
 HomePod or Sonos and sets it automatically.
 

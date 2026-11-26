@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.0
+
+- **New add-on page "AirPlay Bridge"** (sidebar) with two tabs:
+  **Speakers** and **Calibrate**. Fresh look, light and dark mode.
+- **Speaker tiles:** status (playing / ready / not paired), current track
+  with cover, offset, volume, stereo pair; buttons to edit and calibrate.
+- **Add speakers from Home Assistant:** the page finds every echo-dot-assist
+  device (room, model, IP, token entity, voice assistant). Tap, check the
+  name, save; known offsets from the docs table are offered (Echo 2: −225 ms).
+- **Edit and remove** speakers, choose a stereo partner from the list.
+  Offset and volume apply live; structural changes restart the add-on and
+  the page reloads by itself. Pairing tokens are never sent to the page.
+- The speakers stay visible in the configuration tab (`zones`).
+- New API: /api/config, /api/discover, /api/zones/{i}/cover (speakers.py).
+
 ## 0.5.2
 
 - External MQTT broker: new options `mqtt_host`, `mqtt_port`,
