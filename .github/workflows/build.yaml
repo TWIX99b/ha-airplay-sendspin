@@ -1,0 +1,127 @@
+name: Test & build
+
+# Every push: lint + tests. On main, a NEW add-on version (config.yaml)
+# is also built for amd64/aarch64 and published to GHCR, so Home Assistant
+# only has to download the image instead of compiling shairport-sync.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ADDON_DIR: airplay2_sendspin_bridge
+  IMAGE_NAME: addon-airplay2-sendspin-bridge
+  REGISTRY_PREFIX: ghcr.io/twix99b
+
+jobs:
+  test:
+    name: Lint & tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install tools
+        run: pip install "ruff==0.16.9" numpy pyyaml
+
+      - name: Lint
+        run: |
+          ruff check --select F,E,W,B,UP,SIM,I --target-version py312 "$ADDON_DIR/app"
+          ruff format --check "$ADDON_DIR/app"
+          ruff check --select F,E9 tests
+
+      - name: YAML
+        run: |
+          python - <<'EOF'
+          import glob, yaml
+          for f in glob.glob("**/*.yaml", recursive=True):
+              yaml.safe_load(open(f, encoding="utf-8"))
+          print("yaml ok")
+          EOF
+
+      - name: JavaScript syntax
+        run: |
+          node -e "
+          const fs = require('fs');
+          const h = fs.readFileSync(process.env.ADDON_DIR + '/app/static/index.html', 'utf8');
+          new Function(h.split('<script>')[1].split('</script>')[0]);
+          console.log('js ok');"
+
+      - name: Calibration tests
+        run: |
+          python tests/test_calibration.py
+          python tests/test_volume_matching.py
+
+  init:
+    name: Prepare build
+    needs: test
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      version: ${{ steps.version.outputs.version }}
+      push: ${{ steps.version.outputs.push }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Add-on version
+        id: version
+        run: |
+          version=$(sed -nE 's/^version: *"?([^"]+)"?.*/\1/p' "$ADDON_DIR/config.yaml")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_EVENT_NAME" != "pull_request" && "$GITHUB_REF" == "refs/heads/main" ]]; then
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Version $version"
+
+      - name: Build matrix
+        id: matrix
+        uses: home-assistant/builder/actions/prepare-multi-arch-matrix@2026.09.0
+        with:
+          architectures: '["amd64", "aarch64"]'
+          image-name: ${{ env.IMAGE_NAME }}
+          registry-prefix: ${{ env.REGISTRY_PREFIX }}
+
+  build:
+    name: Build ${{ matrix.arch }}
+    needs: init
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.init.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build image
+        uses: home-assistant/builder/actions/build-image@2026.09.0
+        with:
+          arch: ${{ matrix.arch }}
+          context: ${{ env.ADDON_DIR }}
+          build-args: |
+            BUILD_FROM=ghcr.io/home-assistant/${{ matrix.arch }}-base-debian:trixie
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          container-registry-username: twix99b
+          image: ${{ matrix.image }}
+          image-tags: |
+            ${{ needs.init.outputs.version }}
+            latest
+          push: ${{ needs.init.outputs.push }}
+          skip-existing: ${{ needs.init.outputs.version }}
+          version: ${{ needs.init.outputs.version }}
+          cosign: "false"
