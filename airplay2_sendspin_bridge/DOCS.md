@@ -76,7 +76,7 @@ zones:
     port: 28928                 # echo-dot-assist
     path: /sendspin
     token_entity: sensor.wohnzimmer_echo_sendspin_pairing_token
-    latency_offset_ms: -120
+    latency_offset_ms: -225
     volume_trim_db: 0
 ```
 
@@ -156,7 +156,8 @@ denn die Lautstärke hängt auch von Raum und Referenz ab. Weitere Werte gern pe
 
 | Lautsprecher | Software | Referenz | `latency_offset_ms` | `volume_trim_db` | Methode | Datum |
 |---|---|---|---|---|---|---|
-| Echo 2 (radar) | echo-dot-assist 2026.11.18 | Sonos | **−120** | *noch offen* | Gehör | 26.11.2026 |
+| Echo 2 (radar) | echo-dot-assist 2026.11.18 | Sonos Roam 2 | **−225** | *noch offen* | von Hand | 26.11.2026 |
+| Echo 2 (radar) | echo-dot-assist 2026.11.18 | HomePod mini | **−225** | *noch offen* | von Hand | 26.11.2026 |
 | Echo Dot 2 (biscuit) | echo-dot-assist | – | *noch offen* | *noch offen* | – | – |
 | Echo Dot 3 (donut) | echo-dot-assist | – | *noch offen* | *noch offen* | – | – |
 | Echo Show 8 (crown) | echo-dot-assist | – | *noch offen* | *noch offen* | – | – |
@@ -298,7 +299,8 @@ them, since volume also depends on the room and the reference. Feel free to repo
 
 | Speaker | Software | Reference | `latency_offset_ms` | `volume_trim_db` | Method | Date |
 |---|---|---|---|---|---|---|
-| Echo 2 (radar) | echo-dot-assist 2026.11.18 | Sonos | **−120** | *open* | by ear | 2026-11-26 |
+| Echo 2 (radar) | echo-dot-assist 2026.11.18 | Sonos Roam 2 | **−225** | *open* | manual | 2026-11-26 |
+| Echo 2 (radar) | echo-dot-assist 2026.11.18 | HomePod mini | **−225** | *open* | manual | 2026-11-26 |
 | Echo Dot 2 (biscuit) | echo-dot-assist | – | *open* | *open* | – | – |
 | Echo Dot 3 (donut) | echo-dot-assist | – | *open* | *open* | – | – |
 | Echo Show 8 (crown) | echo-dot-assist | – | *open* | *open* | – | – |
