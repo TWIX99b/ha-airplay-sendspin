@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2
+
+- The click and noise tracks can be played directly on the "AirPlay Sync"
+  page (▶ button, loops). The audio follows the device's output, so set it
+  to the AirPlay group first. The tracks are served with Range support,
+  which Safari needs for playback.
+- The measurement notices when AirPlay playback stopped in between (e.g.
+  because the microphone interrupts it on iPhone/iPad) and says so.
+
 ## 0.4.1
 
 - Wording: "zone" is now called "speaker" ("Lautsprecher") on the page,

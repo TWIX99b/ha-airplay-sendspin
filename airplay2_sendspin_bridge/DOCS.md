@@ -97,8 +97,10 @@ Das Add-on hat eine eigene Seite **„AirPlay Sync“** in der HA-Seitenleiste
 bzw. unter „Web-UI öffnen“. Dort misst es per Mikrofon den Versatz eines
 Lautsprechers gegenüber einem HomePod oder einer Sonos und stellt ihn automatisch ein.
 
-1. Den **Klick-Track** (`sync-click.wav`) auf der Seite herunterladen.
-2. Ihn per AirPlay auf die Gruppe aus **Lautsprecher + Referenz (HomePod/Sonos)**
+1. Die Audioausgabe auf die AirPlay-Gruppe stellen und den **Klick-Track**
+   direkt auf der Seite mit **▶ Abspielen** starten (oder `sync-click.wav`
+   herunterladen und z. B. in der Musik-App abspielen).
+2. Abgespielt wird per AirPlay auf die Gruppe aus **Lautsprecher + Referenz (HomePod/Sonos)**
    abspielen, z. B. mit der Musik-App am Mac oder iPhone.
 3. Das Gerät mit der Seite **ungefähr gleich weit von beiden** Lautsprechern
    hinlegen, beide etwa gleich laut. Dann auf **Messen** tippen. Das dauert
@@ -113,6 +115,10 @@ Hinweise:
 - Der Browser gibt das Mikrofon nur über **HTTPS** frei, also z. B. über die
   externe HA-Adresse. Klappt es nicht, die Seite über „In neuem Tab öffnen“
   aufrufen.
+- Auf iPhone und iPad kann das Mikrofon die AirPlay-Wiedergabe der Seite
+  unterbrechen. Dann den Track auf einem zweiten Gerät abspielen (z. B. am
+  Mac, dort klappt Abspielen und Messen auf demselben Gerät) oder mit der
+  Musik-App. Die Seite meldet, wenn die Wiedergabe abgebrochen ist.
 - Jeder Meter Abstandsunterschied zum Mikrofon verfälscht um etwa 3 ms.
   Deshalb das Gerät in die Mitte legen.
 - Von Hand geht es auch: `latency_offset_ms` in Schritten von 20–50 ms
@@ -124,8 +130,8 @@ Hinweise:
 Auf derselben Seite gibt es darunter **„Lautstärke angleichen“**. Vorher die
 Zeit einmessen.
 
-1. Den **Rausch-Track** (`level-noise.wav`) herunterladen und per AirPlay auf
-   dieselbe Gruppe abspielen, in normaler Hörlautstärke.
+1. Den **Rausch-Track** (`level-noise.wav`) auf der Seite abspielen oder
+   herunterladen, per AirPlay auf dieselbe Gruppe, in normaler Hörlautstärke.
 2. In iOS beide Lautsprecher der Gruppe auf **dieselbe Einzel-Lautstärke**
    stellen. Gerät in die Mitte legen, **Messen** (etwa 30 Sekunden).
 3. Der Track rauscht 1,5 s und ist dann 3,5 s still. Während des Rauschens
@@ -234,8 +240,10 @@ The add-on has its own page **"AirPlay Sync"** in the HA sidebar or via
 "Open Web UI". It uses the microphone to measure a speaker's offset against a
 HomePod or Sonos and sets it automatically.
 
-1. Download the **click track** (`sync-click.wav`) from the page.
-2. Play it via AirPlay to the group **speaker + reference (HomePod/Sonos)**, e.g. with
+1. Set the audio output to the AirPlay group and start the **click track**
+   right on the page with **▶ Play** (or download `sync-click.wav` and play
+   it e.g. in the Music app).
+2. It plays via AirPlay to the group **speaker + reference (HomePod/Sonos)**, e.g. with
    the Music app on Mac or iPhone.
 3. Put the device showing the page **roughly the same distance from both**
    speakers, both at about the same volume. Then tap **Measure**. It takes
@@ -248,6 +256,10 @@ HomePod or Sonos and sets it automatically.
 Notes:
 - Browsers only allow the microphone over **HTTPS**, e.g. via your external
   HA address. If it doesn't work, use "Open in new tab".
+- On iPhone and iPad the microphone may interrupt the page's AirPlay
+  playback. Then play the track on a second device (e.g. a Mac, where playing
+  and measuring on the same device works) or with the Music app. The page
+  tells you if playback stopped.
 - Every metre of distance difference to the microphone skews the result by
   about 3 ms, so place the device in between.
 - Manual tuning also works: adjust `latency_offset_ms` in 20–50 ms steps
@@ -259,8 +271,8 @@ Notes:
 Further down on the same page is **"Match volume"**. Calibrate the timing
 first.
 
-1. Download the **noise track** (`level-noise.wav`) and play it via AirPlay to
-   the same group, at normal listening volume.
+1. Play the **noise track** (`level-noise.wav`) on the page or download it,
+   via AirPlay to the same group, at normal listening volume.
 2. In iOS, set both speakers of the group to the **same individual volume**.
    Put the device in between, tap **Measure** (about 30 seconds).
 3. The track plays 1.5 s of noise, then 3.5 s of silence. During the noise

@@ -27,6 +27,7 @@ import math
 import os
 import random
 import struct
+import tempfile
 import wave
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -167,8 +168,13 @@ async def save_zone_option(index: int, key: str, value: float) -> bool:
 
 
 def create_app(zones: list[Zone]) -> web.Application:
-    click_wav = build_click_wav()
-    level_wav = build_level_wav()
+    # As files, so FileResponse can answer Range requests (Safari needs them
+    # to play audio in the page).
+    track_dir = Path(tempfile.mkdtemp(prefix="ap2-tracks-"))
+    click_file = track_dir / "sync-click.wav"
+    level_file = track_dir / "level-noise.wav"
+    click_file.write_bytes(build_click_wav())
+    level_file.write_bytes(build_level_wav())
 
     @web.middleware
     async def only_ingress(request: web.Request, handler):
@@ -188,19 +194,11 @@ def create_app(zones: list[Zone]) -> web.Application:
         html = (STATIC / "index.html").read_text(encoding="utf-8")
         return web.Response(text=html, content_type="text/html")
 
-    async def click(_request: web.Request) -> web.Response:
-        return web.Response(
-            body=click_wav,
-            content_type="audio/wav",
-            headers={"Content-Disposition": 'attachment; filename="sync-click.wav"'},
-        )
+    async def click(_request: web.Request) -> web.FileResponse:
+        return web.FileResponse(click_file, headers={"Content-Type": "audio/wav"})
 
-    async def level_track(_request: web.Request) -> web.Response:
-        return web.Response(
-            body=level_wav,
-            content_type="audio/wav",
-            headers={"Content-Disposition": 'attachment; filename="level-noise.wav"'},
-        )
+    async def level_track(_request: web.Request) -> web.FileResponse:
+        return web.FileResponse(level_file, headers={"Content-Type": "audio/wav"})
 
     async def list_zones(_request: web.Request) -> web.Response:
         return web.json_response(

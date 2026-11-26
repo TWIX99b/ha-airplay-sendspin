@@ -32,6 +32,8 @@
   .row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
   code { background:var(--bd); padding:1px 6px; border-radius:6px; }
   a { color:var(--acc); }
+  .player { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:6px 0 2px; }
+  .player button { margin:0; padding:7px 14px; }
 </style>
 </head>
 <body>
@@ -57,7 +59,14 @@
   <div class="card">
     <h2 data-t="step2"></h2>
     <ol>
-      <li><span data-t="i1"></span> <a href="sync-click.wav" download data-t="download"></a></li>
+      <li><span data-t="i1"></span>
+        <div class="player">
+          <button class="sec play" data-audio="clickAudio" data-t="play"></button>
+          <a href="sync-click.wav" download="sync-click.wav" data-t="download"></a>
+        </div>
+        <span class="muted" data-t="playHint"></span>
+        <audio id="clickAudio" src="sync-click.wav" loop preload="none" x-webkit-airplay="allow"></audio>
+      </li>
       <li data-t="i2"></li>
       <li data-t="i3"></li>
       <li data-t="i4"></li>
@@ -102,7 +111,13 @@
     <h2 data-t="lvPrep"></h2>
     <p class="muted" id="lvCurrent"></p>
     <ol>
-      <li><span data-t="l1"></span> <a href="level-noise.wav" download data-t="lvDownload"></a></li>
+      <li><span data-t="l1"></span>
+        <div class="player">
+          <button class="sec play" data-audio="levelAudio" data-t="play"></button>
+          <a href="level-noise.wav" download="level-noise.wav" data-t="lvDownload"></a>
+        </div>
+        <audio id="levelAudio" src="level-noise.wav" loop preload="none" x-webkit-airplay="allow"></audio>
+      </li>
       <li data-t="l2"></li>
       <li data-t="l3"></li>
       <li data-t="l4"></li>
@@ -152,7 +167,10 @@ const T = DE ? {
   step1: '1 · Lautsprecher wählen', playing: 'spielt über AirPlay', idle: 'spielt gerade nicht',
   current: (o) => `Aktueller Feinabgleich: ${o > 0 ? '+' : ''}${o} ms`,
   step2: '2 · Vorbereiten',
-  i1: 'Klick-Track herunterladen:', download: 'sync-click.wav',
+  i1: 'Klick-Track hier abspielen oder herunterladen:', download: 'Herunterladen',
+  play: '▶ Abspielen', pause: '■ Stoppen',
+  playHint: 'Vorher die Audioausgabe des Geräts auf die AirPlay-Gruppe stellen (iPhone/iPad: Kontrollzentrum, Mac: Menüleiste › Ton). Auf iPhone und iPad kann das Mikrofon die AirPlay-Wiedergabe der Seite unterbrechen – dann auf einem zweiten Gerät abspielen (z. B. Mac) oder mit der Musik-App.',
+  interrupted: 'Die AirPlay-Wiedergabe wurde während der Messung unterbrochen – vermutlich durch das Mikrofon. Den Track auf einem anderen Gerät oder mit der Musik-App abspielen und nochmal messen.',
   i2: 'Den Track per AirPlay auf die Gruppe aus dieser Zone und einem Referenz-Lautsprecher (HomePod/Sonos) abspielen, z. B. mit der Musik-App am Mac oder iPhone.',
   i3: 'Das Gerät mit dieser Seite ungefähr gleich weit von beiden Lautsprechern entfernt hinlegen, ruhig sein.',
   i4: 'Beide Lautsprecher etwa gleich laut einstellen. Wenn oben „spielt über AirPlay“ steht, auf Messen tippen.',
@@ -178,7 +196,7 @@ const T = DE ? {
   lvSub: 'Misst, wie laut der Lautsprecher im Vergleich zur Referenz ist, und gleicht ihn an. Vorher die Zeit einmessen.',
   lvPrep: '1 · Vorbereiten',
   lvCur: (t, v, vt) => `Aktuelle Anpassung: ${fmtDb(t)}` + (v === null ? '' : ` · Lautsprecher-Lautstärke: ${v} %`) + (vt > 0 ? ` (beim Abspielen auf ${vt} %)` : ''),
-  l1: 'Rausch-Track herunterladen:', lvDownload: 'level-noise.wav',
+  l1: 'Rausch-Track hier abspielen oder herunterladen:', lvDownload: 'Herunterladen',
   l2: 'Per AirPlay auf dieselbe Gruppe aus Lautsprecher und Referenz abspielen, in normaler Hörlautstärke.',
   l3: 'In iOS die beiden Lautsprecher in der Gruppe auf dieselbe Einzel-Lautstärke stellen.',
   l4: 'Gerät wieder in die Mitte legen, ruhig sein. Abwechselnd rauscht erst die Referenz, dann der Lautsprecher.',
@@ -203,7 +221,10 @@ const T = DE ? {
   step1: '1 · Choose speaker', playing: 'playing via AirPlay', idle: 'not playing',
   current: (o) => `Current fine offset: ${o > 0 ? '+' : ''}${o} ms`,
   step2: '2 · Prepare',
-  i1: 'Download the click track:', download: 'sync-click.wav',
+  i1: 'Play the click track here or download it:', download: 'Download',
+  play: '▶ Play', pause: '■ Stop',
+  playHint: 'First set the device\'s audio output to the AirPlay group (iPhone/iPad: Control Center, Mac: menu bar › Sound). On iPhone and iPad the microphone may interrupt the page\'s AirPlay playback – then play it on a second device (e.g. a Mac) or with the Music app.',
+  interrupted: 'AirPlay playback was interrupted during the measurement – probably by the microphone. Play the track on another device or with the Music app and measure again.',
   i2: 'Play it via AirPlay to a group of this speaker and a reference (HomePod/Sonos), e.g. with the Music app on Mac or iPhone.',
   i3: 'Put the device showing this page roughly the same distance from both speakers; keep quiet.',
   i4: 'Set both speakers to roughly the same volume. When the status above says "playing via AirPlay", tap Measure.',
@@ -229,7 +250,7 @@ const T = DE ? {
   lvSub: 'Measures how loud the speaker is compared to the reference and matches it. Calibrate the timing first.',
   lvPrep: '1 · Prepare',
   lvCur: (t, v, vt) => `Current trim: ${fmtDb(t)}` + (v === null ? '' : ` · speaker volume: ${v} %`) + (vt > 0 ? ` (set to ${vt} % while playing)` : ''),
-  l1: 'Download the noise track:', lvDownload: 'level-noise.wav',
+  l1: 'Play the noise track here or download it:', lvDownload: 'Download',
   l2: 'Play it via AirPlay to the same group of speaker and reference, at normal listening volume.',
   l3: 'In iOS, set both speakers in the group to the same individual volume.',
   l4: 'Put the device in between again and keep quiet. The reference and the speaker play noise alternately.',
@@ -276,6 +297,24 @@ async function refresh() {
   } catch (e) { /* ignore, try again */ }
 }
 $('zone').onchange = refresh;
+
+// ---------- Play the test tracks in the page ----------
+function playLabels() {
+  document.querySelectorAll('button.play').forEach(b => {
+    b.textContent = $(b.dataset.audio).paused ? T.play : T.pause;
+  });
+}
+document.querySelectorAll('button.play').forEach(b => b.onclick = async () => {
+  const a = $(b.dataset.audio);
+  document.querySelectorAll('audio').forEach(o => { if (o !== a) o.pause(); });
+  if (a.paused) { try { await a.play(); } catch (e) { alert(e.message); } } else { a.pause(); a.currentTime = 0; }
+  playLabels();
+});
+document.querySelectorAll('audio').forEach(a => { a.onplay = a.onpause = playLabels; });
+async function stillPlaying(index) {
+  try { const zs = await (await api('api/zones')).json(); return zs.find(z => z.index === index)?.playing; }
+  catch (e) { return true; }
+}
 refresh(); setInterval(refresh, 2000);
 
 // ---------- Measurement ----------
@@ -363,6 +402,7 @@ async function measure() {
   $('phase').textContent = T.analyse;
   const x = new Float32Array(end); let o = 0;
   for (const c of chunks) { if (o >= end) break; x.set(c.subarray(0, Math.min(c.length, end - o)), o); o += c.length; }
+  if (!(await stillPlaying(z.index))) { $('phase').textContent = T.interrupted; return; }
   const r = analyse(x, sr, markA, markB, end);
   $('phase').textContent = '';
   const good = r.qa > 4 && r.qd > 8;
@@ -460,6 +500,7 @@ async function measureLevel() {
   }
   const x = new Float32Array(end); let o = 0;
   for (const c of chunks) { if (o >= end) break; x.set(c.subarray(0, Math.min(c.length, end - o)), o); o += c.length; }
+  if (!(await stillPlaying(z.index))) { $('lvPhase').textContent = T.interrupted; return; }
   const r = analyseLevel(x, sr, from, end);
   $('lvPhase').textContent = '';
   const good = r.ok && r.snr >= 12;
