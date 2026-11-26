@@ -30,6 +30,12 @@ configuration:
   ignore_airplay_volume:
     name: AirPlay-Lautstärke ignorieren
     description: Immer volle Lautstärke weitergeben, geregelt wird nur am Lautsprecher.
+  speaker_volume:
+    name: Lautsprecher-Lautstärke bei AirPlay (%)
+    description: >-
+      Auf diesen Wert stellt das Add-on den Lautsprecher selbst, solange AirPlay
+      spielt; danach kommt der alte Wert zurück. Geregelt wird dann über
+      AirPlay. 0 = Lautsprecher-Lautstärke nicht anfassen.
   log_level:
     name: Log-Level
   zones:
@@ -38,4 +44,5 @@ configuration:
       Pro Lautsprecher eine Zone: name (so erscheint er in AirPlay), host (IP),
       port (echo-dot-assist: 28928), path (/sendspin), pairing_token oder
       token_entity (Entität „Sendspin pairing token“, muss aktiviert sein),
-      latency_offset_ms (Feinabgleich, + = später).
+      latency_offset_ms (Feinabgleich, + = später), volume_trim_db
+      (Lautstärke-Anpassung, 0 bis −30 dB).

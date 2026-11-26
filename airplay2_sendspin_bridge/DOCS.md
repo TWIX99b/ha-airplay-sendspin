@@ -68,6 +68,7 @@ sendspin_port: 8937             # nicht 8927 (Music Assistant)
 idle_timeout_s: 4
 volume_range_db: 30
 ignore_airplay_volume: false
+speaker_volume: 100             # Lautsprecher bei AirPlay auf 100 %
 log_level: info
 zones:
   - name: Wohnzimmer Echo
@@ -76,6 +77,7 @@ zones:
     path: /sendspin
     token_entity: sensor.wohnzimmer_echo_sendspin_pairing_token
     latency_offset_ms: -120
+    volume_trim_db: 0
 ```
 
 | Option | Bedeutung |
@@ -83,9 +85,11 @@ zones:
 | `ap2_ip` | Eigene IP mit Präfix für die AirPlay-Zonen. Leer = Host-IP, dann kann es Konflikte mit Music Assistant geben. |
 | `latency_ms` | So früh gibt shairport-sync den Ton heraus, so spät spielt ihn der Lautsprecher. Höher = robuster gegen WLAN-Aussetzer. |
 | `volume_range_db` | Regelbereich der AirPlay-Lautstärke. 30 entspricht ungefähr HomePod und Sonos. Kleiner = in der Reglermitte lauter. |
-| `ignore_airplay_volume` | `true` = immer volle Lautstärke, geregelt wird nur am Lautsprecher. |
+| `ignore_airplay_volume` | `true` = immer volle Lautstärke, geregelt wird nur am Lautsprecher. Dann `speaker_volume` herunterstellen. |
+| `speaker_volume` | Lautstärke des Lautsprechers selbst, solange AirPlay spielt (Standard 100 %). Danach kommt der alte Wert zurück, außer er wurde zwischendurch am Lautsprecher verstellt. `0` = nicht anfassen. |
 | `zones[].pairing_token` / `token_entity` | Token direkt eintragen **oder** aus einer HA-Entität lesen. |
 | `zones[].latency_offset_ms` | Feinabgleich pro Zone: + = später, − = früher. |
+| `zones[].volume_trim_db` | Lautstärke-Anpassung pro Zone, 0 bis −30 dB. Wird per Einmessung gesetzt. |
 
 ### Automatisch einmessen
 
@@ -115,17 +119,38 @@ Hinweise:
   verstellen, bis Klatschen oder Schlagzeug nicht mehr doppelt klingt. Auf
   der Seite gibt es dafür auch ±-Knöpfe, die sofort wirken.
 
+### Lautstärke angleichen
+
+Auf derselben Seite gibt es darunter **„Lautstärke angleichen“**. Vorher die
+Zeit einmessen.
+
+1. Den **Rausch-Track** (`level-noise.wav`) herunterladen und per AirPlay auf
+   dieselbe Gruppe abspielen, in normaler Hörlautstärke.
+2. In iOS beide Lautsprecher der Gruppe auf **dieselbe Einzel-Lautstärke**
+   stellen. Gerät in die Mitte legen, **Messen** (etwa 30 Sekunden).
+3. Der Track rauscht 1,5 s und ist dann 3,5 s still. Während des Rauschens
+   bleibt die Zone stumm, in der Stille spielt das Add-on dasselbe Rauschen
+   auf der Zone. So misst die Seite beide Lautsprecher einzeln und berechnet
+   den Unterschied, simuliert auf etwa ±0,5 dB genau.
+4. **Übernehmen & speichern** setzt `volume_trim_db`. Von Hand geht es mit
+   den ±-dB-Knöpfen.
+
+Lauter als 0 dB geht nicht. Ist die Zone dann immer noch leiser, zuerst
+`speaker_volume` prüfen (Standard 100 %), sonst den Referenz-Lautsprecher in
+iOS etwas leiser stellen. Gleich laut heißt nicht gleicher Klang: Ein Echo
+hat weniger Bass als eine Sonos.
+
 ### Messwerte (Info)
 
-Gemessene bzw. abgehörte `latency_offset_ms`-Werte als Orientierung. Die
-Einmessung ersetzt sie. Weitere Werte gern per Issue melden.
+Gemessene bzw. abgehörte Werte als Orientierung. Die Einmessung ersetzt sie,
+denn die Lautstärke hängt auch von Raum und Referenz ab. Weitere Werte gern per Issue melden.
 
-| Lautsprecher | Software | Referenz | `latency_offset_ms` | Methode | Datum |
-|---|---|---|---|---|---|
-| Echo 2 (radar) | echo-dot-assist 2026.11.18 | Sonos | **−120** | Gehör | 26.11.2026 |
-| Echo Dot 2 (biscuit) | echo-dot-assist | – | *noch offen* | – | – |
-| Echo Dot 3 (donut) | echo-dot-assist | – | *noch offen* | – | – |
-| Echo Show 8 (crown) | echo-dot-assist | – | *noch offen* | – | – |
+| Lautsprecher | Software | Referenz | `latency_offset_ms` | `volume_trim_db` | Methode | Datum |
+|---|---|---|---|---|---|---|
+| Echo 2 (radar) | echo-dot-assist 2026.11.18 | Sonos | **−120** | *noch offen* | Gehör | 26.11.2026 |
+| Echo Dot 2 (biscuit) | echo-dot-assist | – | *noch offen* | *noch offen* | – | – |
+| Echo Dot 3 (donut) | echo-dot-assist | – | *noch offen* | *noch offen* | – | – |
+| Echo Show 8 (crown) | echo-dot-assist | – | *noch offen* | *noch offen* | – | – |
 
 ### Hinweise
 
@@ -197,9 +222,11 @@ iPhone ──AirPlay 2──► shairport-sync (per zone) ──PCM──► bri
 | `ap2_ip` | Dedicated IP with prefix for the AirPlay zones. Empty = host IP, which can clash with Music Assistant. |
 | `latency_ms` | How early shairport-sync releases audio and how much later the speaker plays it. Higher = more robust against Wi-Fi dropouts. |
 | `volume_range_db` | AirPlay volume range. 30 roughly matches HomePod and Sonos. Smaller = louder mid-slider. |
-| `ignore_airplay_volume` | `true` = always full volume, loudness is set on the speaker only. |
+| `ignore_airplay_volume` | `true` = always full volume, loudness is set on the speaker only. Lower `speaker_volume` then. |
+| `speaker_volume` | Volume of the speaker itself while AirPlay plays (default 100 %). The old value is restored afterwards, unless it was changed on the speaker meanwhile. `0` = don't touch. |
 | `zones[].pairing_token` / `token_entity` | Enter the token directly **or** read it from an HA entity. |
 | `zones[].latency_offset_ms` | Per-zone fine tuning: + = later, − = earlier. |
+| `zones[].volume_trim_db` | Per-zone volume trim, 0 to −30 dB. Set by the calibration. |
 
 ### Automatic calibration
 
@@ -227,17 +254,37 @@ Notes:
   until claps or drums no longer sound doubled. The page has ± buttons for
   this too, which take effect immediately.
 
+### Volume matching
+
+Further down on the same page is **"Match volume"**. Calibrate the timing
+first.
+
+1. Download the **noise track** (`level-noise.wav`) and play it via AirPlay to
+   the same group, at normal listening volume.
+2. In iOS, set both speakers of the group to the **same individual volume**.
+   Put the device in between, tap **Measure** (about 30 seconds).
+3. The track plays 1.5 s of noise, then 3.5 s of silence. During the noise
+   the zone stays silent; in the silence the add-on plays the same noise on
+   the zone. So the page measures both speakers separately and computes the
+   difference, simulated to about ±0.5 dB.
+4. **Apply & save** sets `volume_trim_db`. The ± dB buttons adjust it by hand.
+
+Above 0 dB is not possible. If the zone is still quieter, check
+`speaker_volume` first (default 100 %), otherwise turn the reference speaker
+down a little in iOS. Equally loud doesn't mean equal sound: an Echo has less
+bass than a Sonos.
+
 ### Measured values (info)
 
-Measured or by-ear `latency_offset_ms` values as a starting point. The
-calibration replaces them. Feel free to report more values via an issue.
+Measured or by-ear values as a starting point. The calibration replaces
+them, since volume also depends on the room and the reference. Feel free to report more values via an issue.
 
-| Speaker | Software | Reference | `latency_offset_ms` | Method | Date |
-|---|---|---|---|---|---|
-| Echo 2 (radar) | echo-dot-assist 2026.11.18 | Sonos | **−120** | by ear | 2026-11-26 |
-| Echo Dot 2 (biscuit) | echo-dot-assist | – | *open* | – | – |
-| Echo Dot 3 (donut) | echo-dot-assist | – | *open* | – | – |
-| Echo Show 8 (crown) | echo-dot-assist | – | *open* | – | – |
+| Speaker | Software | Reference | `latency_offset_ms` | `volume_trim_db` | Method | Date |
+|---|---|---|---|---|---|---|
+| Echo 2 (radar) | echo-dot-assist 2026.11.18 | Sonos | **−120** | *open* | by ear | 2026-11-26 |
+| Echo Dot 2 (biscuit) | echo-dot-assist | – | *open* | *open* | – | – |
+| Echo Dot 3 (donut) | echo-dot-assist | – | *open* | *open* | – | – |
+| Echo Show 8 (crown) | echo-dot-assist | – | *open* | *open* | – | – |
 
 ### Notes
 

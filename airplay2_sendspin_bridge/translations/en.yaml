@@ -26,6 +26,12 @@ configuration:
   ignore_airplay_volume:
     name: Ignore AirPlay volume
     description: Always pass full volume, control loudness on the speaker only.
+  speaker_volume:
+    name: Speaker volume during AirPlay (%)
+    description: >-
+      The add-on sets the speaker itself to this value while AirPlay plays and
+      restores the old value afterwards; loudness is then controlled via
+      AirPlay. 0 = don't touch the speaker volume.
   log_level:
     name: Log level
   zones:
@@ -34,4 +40,4 @@ configuration:
       One zone per speaker: name (shown in AirPlay), host (IP), port
       (echo-dot-assist: 28928), path (/sendspin), pairing_token or token_entity
       (entity "Sendspin pairing token", must be enabled), latency_offset_ms
-      (fine tuning, + = later).
+      (fine tuning, + = later), volume_trim_db (volume trim, 0 to −30 dB).

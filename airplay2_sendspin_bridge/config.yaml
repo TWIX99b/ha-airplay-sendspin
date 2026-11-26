@@ -1,5 +1,5 @@
 name: AirPlay 2 → Sendspin Bridge
-version: "0.3.0"
+version: "0.4.0"
 slug: airplay2_sendspin_bridge
 description: >-
   Turns Sendspin speakers (e.g. Echos with echo-dot-assist) into real AirPlay 2
@@ -32,6 +32,7 @@ options:
   idle_timeout_s: 4
   volume_range_db: 30
   ignore_airplay_volume: false
+  speaker_volume: 100
   log_level: info
   zones: []
 schema:
@@ -43,6 +44,7 @@ schema:
   idle_timeout_s: int(1,60)
   volume_range_db: int(20,90)
   ignore_airplay_volume: bool
+  speaker_volume: int(0,100)
   log_level: list(debug|info|warning|error)
   zones:
     - name: str
@@ -52,3 +54,4 @@ schema:
       pairing_token: password?
       token_entity: str?
       latency_offset_ms: int(-1000,1000)?
+      volume_trim_db: float(-30,0)?

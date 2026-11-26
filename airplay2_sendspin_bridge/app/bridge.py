@@ -24,12 +24,13 @@ import logging
 import os
 import signal
 import time
+from array import array
 from dataclasses import dataclass
 from pathlib import Path
 
 import aiohttp
 from aiosendspin.audio.format import AudioFormat
-from aiosendspin.models.types import ConnectionReason, PairMethod
+from aiosendspin.models.types import ConnectionReason, PairMethod, PlayerCommand
 from aiosendspin.noise import (
     FileServerPairingStore,
     Identity,
@@ -70,6 +71,13 @@ AIRPLAY_BASE_PORT = 7000
 # shairport-sync keeps this much audio "in the output buffer" ahead of
 # the play time; the bridge adds it back on.
 SPS_BUFFER_S = 1.0
+# Volume matching (web UI): the level track alternates noise and silence.
+# During noise the zone is silent (only the reference speaker plays), in
+# the silence the bridge replays the noise it just received on the zone.
+LEVEL_PEAK_SILENT = 100  # chunk peak below this (≈ −50 dBFS) counts as silence
+LEVEL_INJECT_FROM = 25  # chunks (0.5 s) into the silence …
+LEVEL_INJECT_TO = 125  # … until 2.5 s
+LEVEL_BUF_MAX = 150  # keep at most 3 s of noise
 PCM_FORMAT = AudioFormat(sample_rate=SAMPLE_RATE, bit_depth=16, channels=CHANNELS)
 
 log = logging.getLogger("bridge")
@@ -85,6 +93,7 @@ class ZoneConfig:
     pairing_token: str
     token_entity: str
     latency_offset_ms: int
+    volume_trim_db: float = 0.0
 
     @property
     def url(self) -> str:
@@ -155,6 +164,25 @@ def airplay_device_id(zone: ZoneConfig) -> str:
     raw = bytearray(digest[:6])
     raw[0] = (raw[0] | 0x02) & 0xFE  # locally administered, unicast
     return "0x" + raw.hex().upper() + "L"
+
+
+def chunk_peak(pcm: bytes) -> int:
+    samples = array("h")
+    samples.frombytes(pcm)
+    return max(max(samples), -min(samples)) if samples else 0
+
+
+def apply_gain(pcm: bytes, gain: float) -> bytes:
+    """Scale S16 PCM (gain ≤ 1, so no clipping)."""
+    samples = array("h")
+    samples.frombytes(pcm)
+    return array("h", [int(v * gain) for v in samples]).tobytes()
+
+
+def player_role(client):
+    """The Sendspin player role of a client (volume control), if any."""
+    roles = client.roles_by_family("player") if client is not None else []
+    return roles[0] if roles else None
 
 
 def write_shairport_config(zone: ZoneConfig, latency_ms: int, opts: dict) -> Path:
@@ -271,7 +299,7 @@ class SendspinSide:
         return None
 
     async def acquire(self, zone: ZoneConfig, client_id: str):
-        """Take the Echo over for playback and return its group."""
+        """Take the Echo over for playback and return (client, group)."""
         assert self.server
         await self.server.connect_to_client_and_wait(
             zone.url, connection_reason=ConnectionReason.PLAYBACK
@@ -286,7 +314,7 @@ class SendspinSide:
                 log.info(
                     "[%s] Echo ready after %.2f s", zone.name, loop.time() - started
                 )
-                return client.group
+                return client, client.group
             await asyncio.sleep(0.1)
         raise RuntimeError("Echo did not report ready within 10 s")
 
@@ -314,7 +342,79 @@ class Zone:
         # Calibration (web UI): status and live intervention
         self.streaming = False
         self.cal_mute = False
+        self.level_mode = False
         self._force_resync = False
+        self._lvl_buf: list[bytes] = []
+        self._lvl_silent = 0
+        # Speaker volume while AirPlay plays (0 = leave it alone)
+        self.speaker_volume = int(opts.get("speaker_volume", 100))
+        self.player = None
+        self._volume_before: int | None = None
+
+    @property
+    def echo_volume(self) -> int | None:
+        """Current volume of the speaker itself (only while playing)."""
+        if not self.streaming or self.player is None:
+            return None
+        return self.player.volume
+
+    def set_trim(self, trim_db: float) -> None:
+        """Change the volume trim immediately."""
+        self.cfg.volume_trim_db = round(float(trim_db), 1)
+        self.log.info("volume_trim_db is now %+.1f dB", self.cfg.volume_trim_db)
+
+    def set_level_mode(self, on: bool) -> None:  # noqa: FBT001
+        self.level_mode = on
+        self._lvl_buf = []
+        self._lvl_silent = 0
+
+    def _level_chunk(self, pcm: bytes) -> bytes:
+        """Volume matching: silent during the track's noise, replay it in the gaps."""
+        if chunk_peak(pcm) > LEVEL_PEAK_SILENT:
+            if self._lvl_silent:  # a new noise block begins
+                self._lvl_buf = []
+                self._lvl_silent = 0
+            if len(self._lvl_buf) < LEVEL_BUF_MAX:
+                self._lvl_buf.append(pcm)
+            return bytes(len(pcm))
+        self._lvl_silent += 1
+        k = self._lvl_silent - LEVEL_INJECT_FROM
+        if self._lvl_buf and 0 <= k < LEVEL_INJECT_TO - LEVEL_INJECT_FROM:
+            return self._lvl_buf[k % len(self._lvl_buf)]
+        return pcm
+
+    def _take_volume(self) -> None:
+        """Set the speaker to speaker_volume for AirPlay, remember the old value."""
+        self._volume_before = None
+        target = self.speaker_volume
+        player = self.player
+        if target <= 0 or player is None:
+            return
+        if PlayerCommand.VOLUME not in player.state_supported_commands:
+            self.log.warning("Speaker does not accept volume commands")
+            return
+        before = player.volume
+        if before != target:
+            player.set_volume(target)
+            self._volume_before = before
+            self.log.info("Speaker volume %d → %d for AirPlay", before, target)
+
+    async def _give_volume_back(self) -> None:
+        """Restore the old speaker volume, unless someone changed it meanwhile."""
+        before, self._volume_before = self._volume_before, None
+        player = self.player
+        if before is None or player is None:
+            return
+        if abs(player.volume - self.speaker_volume) > 1:
+            self.log.info(
+                "Speaker volume was changed during AirPlay (%d), keeping it",
+                player.volume,
+            )
+            return
+        with contextlib.suppress(Exception):
+            player.set_volume(before)
+            self.log.info("Speaker volume back to %d", before)
+            await asyncio.sleep(0.3)  # let the command go out before disconnecting
 
     def set_offset(self, offset_ms: int) -> None:
         """Change the fine offset immediately (takes effect at once)."""
@@ -442,13 +542,15 @@ class Zone:
         assert self.client_id
         self.log.info("AirPlay playback started → taking over %s", self.cfg.host)
         try:
-            group = await self.side.acquire(self.cfg, self.client_id)
+            client, group = await self.side.acquire(self.cfg, self.client_id)
         except Exception as err:  # noqa: BLE001
             self.log.error("Could not take over the Echo: %s", err)
             while await self._next(queue) is not None:
                 pass  # throw away until the pause
             return
 
+        self.player = player_role(client)
+        self._take_volume()
         stream = group.start_stream()
         self.streaming = True
         next_ts: int | None = None
@@ -501,9 +603,13 @@ class Zone:
                         err_avg = 0.0
 
                 if next_ts is not None:
+                    if self.level_mode:  # volume matching (web UI)
+                        parts = [self._level_chunk(p) for p in parts]
                     pcm = b"".join(parts)
                     if self.cal_mute:  # calibration: silent, timing unchanged
                         pcm = bytes(len(pcm))
+                    elif self.cfg.volume_trim_db < 0:
+                        pcm = apply_gain(pcm, 10 ** (self.cfg.volume_trim_db / 20))
                     stream.prepare_audio(pcm, PCM_FORMAT)
                     await stream.commit_audio(play_start_us=next_ts)
                     next_ts += CHUNK_US * len(parts)
@@ -527,8 +633,11 @@ class Zone:
         finally:
             self.streaming = False
             self.cal_mute = False
+            self.set_level_mode(False)
             with contextlib.suppress(Exception):
                 await group.stop()
+            await self._give_volume_back()
+            self.player = None
             self.side.release(self.cfg)
 
 
@@ -560,6 +669,7 @@ async def main() -> None:
             pairing_token=(z.get("pairing_token") or "").strip(),
             token_entity=(z.get("token_entity") or "").strip(),
             latency_offset_ms=int(z.get("latency_offset_ms") or 0),
+            volume_trim_db=min(0.0, float(z.get("volume_trim_db") or 0)),
         )
         zones.append(Zone(cfg, side, opts))
     if not zones:

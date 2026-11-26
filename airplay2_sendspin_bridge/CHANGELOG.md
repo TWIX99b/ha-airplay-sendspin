@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0
+
+- **Speaker volume during AirPlay** (`speaker_volume`, default 100 %): the
+  add-on turns the speaker itself up via Sendspin while AirPlay plays and
+  restores the old value afterwards. Loudness is then controlled via AirPlay
+  like a HomePod. Fixes very quiet Echos.
+- **Volume matching** on the "AirPlay Sync" page: noise track, the zone and
+  the reference are measured separately, result as `volume_trim_db`
+  (0 to −30 dB, simulated accuracy ±0.5 dB), applied live and saved.
+- Manual ± dB buttons for the trim.
+- DOCS: volume section (de/en), info table with a `volume_trim_db` column.
+- tests/test_volume_matching.py: end-to-end simulation with the real bridge
+  and page code.
+
 ## 0.3.0
 
 - **Automatic calibration** via its own page "AirPlay Sync" (ingress):

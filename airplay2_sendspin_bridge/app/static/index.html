@@ -94,6 +94,51 @@
     </div>
     <p class="muted" data-t="manualHint"></p>
   </div>
+
+  <h1 style="margin-top:32px" data-t="lvTitle"></h1>
+  <p class="sub" data-t="lvSub"></p>
+
+  <div class="card">
+    <h2 data-t="lvPrep"></h2>
+    <p class="muted" id="lvCurrent"></p>
+    <ol>
+      <li><span data-t="l1"></span> <a href="level-noise.wav" download data-t="lvDownload"></a></li>
+      <li data-t="l2"></li>
+      <li data-t="l3"></li>
+      <li data-t="l4"></li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2 data-t="lvMeasure"></h2>
+    <button id="lvStart" data-t="start"></button>
+    <div class="bar"><div id="lvProg"></div></div>
+    <div class="muted" id="lvPhase"></div>
+  </div>
+
+  <div class="card" id="lvResult" hidden>
+    <h2 data-t="result"></h2>
+    <div class="big" id="lvBig"></div>
+    <div id="lvText"></div>
+    <div class="muted" id="lvQual"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="lvApply" data-t="apply"></button>
+      <button class="sec" id="lvAgain" data-t="again"></button>
+    </div>
+    <div class="muted" id="lvApplied"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-t="lvManual"></h2>
+    <div class="row">
+      <button class="sec" data-trim="-3">−3 dB</button>
+      <button class="sec" data-trim="-1">−1 dB</button>
+      <button class="sec" data-trim="1">+1 dB</button>
+      <button class="sec" data-trim="3">+3 dB</button>
+      <button id="lvSave" data-t="save"></button>
+    </div>
+    <p class="muted" data-t="lvManualHint"></p>
+  </div>
 </main>
 
 <script>
@@ -129,6 +174,26 @@ const T = DE ? {
   save: 'Speichern',
   notPlaying: 'Die Zone spielt gerade nicht über AirPlay – erst den Klick-Track starten.',
   micErr: 'Mikrofon nicht verfügbar: ',
+  lvTitle: 'Lautstärke angleichen',
+  lvSub: 'Misst, wie laut die Zone im Vergleich zum Referenz-Lautsprecher ist, und gleicht sie an. Vorher die Zeit einmessen.',
+  lvPrep: '1 · Vorbereiten',
+  lvCur: (t, v, vt) => `Aktuelle Anpassung: ${fmtDb(t)}` + (v === null ? '' : ` · Lautsprecher-Lautstärke: ${v} %`) + (vt > 0 ? ` (beim Abspielen auf ${vt} %)` : ''),
+  l1: 'Rausch-Track herunterladen:', lvDownload: 'level-noise.wav',
+  l2: 'Per AirPlay auf dieselbe Gruppe aus Zone und Referenz abspielen, in normaler Hörlautstärke.',
+  l3: 'In iOS die beiden Lautsprecher in der Gruppe auf dieselbe Einzel-Lautstärke stellen.',
+  l4: 'Gerät wieder in die Mitte legen, ruhig sein. Abwechselnd rauscht erst die Referenz, dann die Zone.',
+  lvMeasure: '2 · Messen (ca. 30 Sekunden)',
+  lvPh: 'Misst – Referenz und Zone rauschen abwechselnd …',
+  lvLouder: (d) => `Die Zone ist ${d.toFixed(1)} dB lauter`,
+  lvQuieter: (d) => `Die Zone ist ${d.toFixed(1)} dB leiser`,
+  lvEqual: 'Beide sind gleich laut (±0,5 dB)',
+  lvSuggest: (n) => `Neue Anpassung: <b>${fmtDb(n)}</b>`,
+  lvBoost: (d, v) => `Lauter geht nicht: Die Zone spielt schon unverändert (0 dB)` + (v !== null && v < 100 ? ` und der Lautsprecher steht auf ${v} %. Option „Lautsprecher-Lautstärke bei AirPlay“ erhöhen.` : `. Den Referenz-Lautsprecher in iOS um etwa ${d.toFixed(0)} dB leiser stellen.`),
+  lvQual: (snr) => `Signalabstand: ${snr.toFixed(0)} dB (gut: über 12)`,
+  lvBad: 'Messung unsicher – lauter abspielen, Umgebung ruhiger, und vorher die Zeit einmessen (Rauschen von Zone und Referenz darf sich nicht überlappen).',
+  lvApplied: (n, s) => `Übernommen: ${fmtDb(n)}${s ? ' – gespeichert.' : ' – live aktiv, Speichern hat nicht geklappt.'}`,
+  lvManual: 'Lautstärke von Hand',
+  lvManualHint: 'Wirkt sofort. 0 dB = unverändert, weniger = Zone leiser. Lauter als 0 dB geht nicht.',
 } : {
   title: 'AirPlay Sync – Calibration',
   subtitle: 'Uses the microphone to measure how far a zone is off compared to a HomePod/Sonos and sets the offset automatically.',
@@ -160,7 +225,28 @@ const T = DE ? {
   save: 'Save',
   notPlaying: 'The zone is not playing via AirPlay – start the click track first.',
   micErr: 'Microphone not available: ',
+  lvTitle: 'Match volume',
+  lvSub: 'Measures how loud the zone is compared to the reference speaker and matches it. Calibrate the timing first.',
+  lvPrep: '1 · Prepare',
+  lvCur: (t, v, vt) => `Current trim: ${fmtDb(t)}` + (v === null ? '' : ` · speaker volume: ${v} %`) + (vt > 0 ? ` (set to ${vt} % while playing)` : ''),
+  l1: 'Download the noise track:', lvDownload: 'level-noise.wav',
+  l2: 'Play it via AirPlay to the same group of zone and reference, at normal listening volume.',
+  l3: 'In iOS, set both speakers in the group to the same individual volume.',
+  l4: 'Put the device in between again and keep quiet. The reference and the zone play noise alternately.',
+  lvMeasure: '2 · Measure (about 30 s)',
+  lvPh: 'Measuring – reference and zone play noise alternately …',
+  lvLouder: (d) => `The zone is ${d.toFixed(1)} dB louder`,
+  lvQuieter: (d) => `The zone is ${d.toFixed(1)} dB quieter`,
+  lvEqual: 'Both are equally loud (±0.5 dB)',
+  lvSuggest: (n) => `New trim: <b>${fmtDb(n)}</b>`,
+  lvBoost: (d, v) => `Can't go louder: the zone already plays unchanged (0 dB)` + (v !== null && v < 100 ? ` and the speaker is at ${v} %. Raise the option "Speaker volume during AirPlay".` : `. Turn the reference speaker down by about ${d.toFixed(0)} dB in iOS.`),
+  lvQual: (snr) => `Signal-to-noise: ${snr.toFixed(0)} dB (good: above 12)`,
+  lvBad: 'Measurement uncertain – play louder, reduce noise, and calibrate the timing first (the noise of zone and reference must not overlap).',
+  lvApplied: (n, s) => `Applied: ${fmtDb(n)}${s ? ' – saved.' : ' – active now, saving failed.'}`,
+  lvManual: 'Adjust volume manually',
+  lvManualHint: 'Takes effect immediately. 0 dB = unchanged, less = zone quieter. Above 0 dB is not possible.',
 };
+function fmtDb(v) { const s = (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1); return (DE ? s.replace('.', ',') : s) + ' dB'; }
 document.documentElement.lang = DE ? 'de' : 'en';
 document.querySelectorAll('[data-t]').forEach(el => { const v = T[el.dataset.t]; if (typeof v === 'string') el.textContent = v; });
 
@@ -186,6 +272,7 @@ async function refresh() {
     $('state').textContent = z.playing ? T.playing : T.idle;
     $('state').className = 'pill ' + (z.playing ? 'on' : 'off');
     $('current').textContent = T.current(z.offset_ms);
+    $('lvCurrent').textContent = T.lvCur(z.trim_db, z.speaker_volume, z.speaker_volume_target);
   } catch (e) { /* ignore, try again */ }
 }
 $('zone').onchange = refresh;
@@ -287,6 +374,128 @@ async function measure() {
   $('apply').disabled = !good || Math.abs(r.delay) <= 3;
   $('result').hidden = false;
 }
+
+// ---------- Volume matching ----------
+const LV_CYCLE = 5.0;   // s, noise 1.5 s + silence 3.5 s
+const LV_BINS = 500;    // 10 ms per bin
+const LV_EDGE = 15;     // bins ignored at each edge of a block (fade, reverb)
+let lvSuggested = null;
+
+function highpass(x, sr, f0) {
+  const w = 2 * Math.PI * f0 / sr, al = Math.sin(w) / (2 * Math.SQRT1_2), cw = Math.cos(w), a0 = 1 + al;
+  const b0 = (1 + cw) / 2 / a0, b1 = -(1 + cw) / a0, b2 = b0, a1 = -2 * cw / a0, a2 = (1 - al) / a0;
+  const y = new Float32Array(x.length); let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < x.length; i++) {
+    const v = b0 * x[i] + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    x2 = x1; x1 = x[i]; y2 = y1; y1 = v; y[i] = v;
+  }
+  return y;
+}
+function analyseLevel(x, sr, from, end) {
+  const y = highpass(highpass(x, sr, 150), sr, 150);
+  const cyc = sr * LV_CYCLE, E = new Float64Array(LV_BINS), C = new Float64Array(LV_BINS);
+  for (let i = from; i < end; i++) {                    // fold every sample onto the 5 s cycle
+    const k = Math.floor(((i % cyc) / cyc) * LV_BINS);
+    E[k] += y[i] * y[i]; C[k]++;
+  }
+  const P = new Float64Array(LV_BINS);                  // mean power per bin
+  for (let k = 0; k < LV_BINS; k++) P[k] = C[k] ? E[k] / C[k] : 0;
+  const L = Array.from(P, p => 10 * Math.log10(p + 1e-20));
+  const floor = Array.from(L).sort((a, b) => a - b)[Math.floor(LV_BINS * 0.1)];
+  const act = L.map(v => v > floor + 8);
+  let s0 = act.indexOf(false);                           // start the walk in a gap
+  if (s0 < 0) return { ok: false, snr: 0, runs: [] };
+  const runs = []; let cur = null;
+  for (let n = 1; n <= LV_BINS; n++) {
+    const k = (s0 + n) % LV_BINS;
+    if (act[k]) { if (!cur) cur = { start: k, len: 0 }; cur.len++; }
+    else if (cur) { runs.push(cur); cur = null; }
+  }
+  const blocks = runs.filter(r => r.len >= 30).sort((a, b) => a.len - b.len);
+  if (blocks.length !== 2) return { ok: false, snr: 0, runs: blocks.map(r => r.len) };
+  const level = (r) => {
+    let p = 0, c = 0;
+    for (let n = LV_EDGE; n < r.len - LV_EDGE; n++) { p += P[(r.start + n) % LV_BINS]; c++; }
+    return 10 * Math.log10(p / c + 1e-20);
+  };
+  const [ref, zone] = blocks;                            // reference 1.5 s, zone 2.0 s
+  const lr = level(ref), lz = level(zone);
+  const snr = Math.min(lr, lz) - floor;
+  const ok = ref.len >= 120 && ref.len <= 210 && zone.len >= 170 && zone.len <= 270 && zone.len - ref.len >= 25;
+  return { ok, diff: lz - lr, snr, runs: [ref.len, zone.len] };
+}
+
+async function measureLevel() {
+  const z = zone();
+  $('lvResult').hidden = true; $('lvApplied').textContent = '';
+  if (!z || !z.playing) { alert(T.notPlaying); return; }
+  const guard = z.lead_ms / 1000 + 1.0 + LV_CYCLE;       // bridge delay + one full cycle
+  const meas = 4 * LV_CYCLE;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  } catch (e) { alert(T.micErr + e.message); return; }
+  $('lvStart').disabled = true;
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  await ctx.resume();
+  const sr = ctx.sampleRate, src = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(4096, 1, 1);
+  const chunks = []; let count = 0;
+  proc.onaudioprocess = (ev) => { const d = new Float32Array(ev.inputBuffer.getChannelData(0)); chunks.push(d); count += d.length; };
+  src.connect(proc); proc.connect(ctx.destination);
+  const total = (guard + meas) * 1000, t0 = performance.now();
+  const tick = setInterval(() => { $('lvProg').style.width = Math.min(100, (performance.now() - t0) / total * 100) + '%'; }, 200);
+  let from = 0, end = 0;
+  try {
+    $('lvPhase').textContent = T.lvPh;
+    await api(`api/zones/${z.index}/level`, { on: true });
+    await sleep(guard * 1000); from = count;
+    await sleep(meas * 1000); end = count;
+  } finally {
+    await api(`api/zones/${z.index}/level`, { on: false });
+    clearInterval(tick); proc.disconnect(); src.disconnect();
+    stream.getTracks().forEach(t => t.stop()); await ctx.close();
+    $('lvStart').disabled = false;
+  }
+  const x = new Float32Array(end); let o = 0;
+  for (const c of chunks) { if (o >= end) break; x.set(c.subarray(0, Math.min(c.length, end - o)), o); o += c.length; }
+  const r = analyseLevel(x, sr, from, end);
+  $('lvPhase').textContent = '';
+  const good = r.ok && r.snr >= 12;
+  $('lvResult').hidden = false;
+  if (!r.ok) {
+    $('lvBig').textContent = '–'; $('lvBig').className = 'big warn';
+    $('lvText').textContent = ''; $('lvQual').textContent = T.lvBad;
+    $('lvApply').disabled = true; lvSuggested = null; return;
+  }
+  const d = r.diff;
+  $('lvBig').textContent = Math.abs(d) <= 0.5 ? T.lvEqual : (d > 0 ? T.lvLouder(d) : T.lvQuieter(-d));
+  $('lvBig').className = 'big ' + (good ? 'ok' : 'warn');
+  const want = Math.round((z.trim_db - d) * 10) / 10;
+  lvSuggested = Math.max(-30, Math.min(0, want));
+  $('lvText').innerHTML = T.lvSuggest(lvSuggested) + (want > 0.5 ? '<br><span class="warn">' + T.lvBoost(want, z.speaker_volume) + '</span>' : '');
+  $('lvQual').textContent = T.lvQual(r.snr) + (good ? '' : ' — ' + T.lvBad);
+  $('lvApply').disabled = !good || Math.abs(lvSuggested - z.trim_db) < 0.5;
+}
+
+async function setTrim(value, save) {
+  const z = zone(); if (!z) return null;
+  const r = await api(`api/zones/${z.index}/trim`, { trim_db: value, save });
+  const j = await r.json(); await refresh(); return j;
+}
+$('lvStart').onclick = measureLevel;
+$('lvAgain').onclick = measureLevel;
+$('lvApply').onclick = async () => {
+  if (lvSuggested === null) return;
+  const j = await setTrim(lvSuggested, true);
+  if (j) $('lvApplied').textContent = T.lvApplied(j.trim_db, j.saved);
+};
+document.querySelectorAll('[data-trim]').forEach(b => b.onclick = async () => {
+  const z = zone(); if (!z) return;
+  await setTrim(Math.max(-30, Math.min(0, Math.round((z.trim_db + Number(b.dataset.trim)) * 10) / 10)), false);
+});
+$('lvSave').onclick = async () => { const z = zone(); if (z) await setTrim(z.trim_db, true); };
 
 async function setOffset(value, save) {
   const z = zone(); if (!z) return null;
