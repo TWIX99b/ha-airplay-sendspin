@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+- **Automatic calibration** via its own page "AirPlay Sync" (ingress):
+  click track, microphone recording in the browser, zone muted alternately,
+  evaluation by folding onto the click period with onset detection
+  (simulated accuracy ±1–2 ms). The result is applied live and saved in the
+  options.
+- Manual ± fine tuning on the page, takes effect immediately while playing.
+- `latency_offset_ms` can be changed live (no restart needed).
+- Info table with measured values in DOCS.
+
 ## 0.2.1
 
 - Add-on description in English, DOCS in German and English.

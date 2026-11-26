@@ -87,13 +87,45 @@ zones:
 | `zones[].pairing_token` / `token_entity` | Token direkt eintragen **oder** aus einer HA-Entität lesen. |
 | `zones[].latency_offset_ms` | Feinabgleich pro Zone: + = später, − = früher. |
 
-### Abgleich
+### Automatisch einmessen
 
-Spiel den Lautsprecher zusammen mit einem HomePod oder einer Sonos ab,
-z. B. ein Lied mit klarem Klatschen oder Schlagzeug wie „We Will Rock You“,
-und stell dich in die Mitte. Dann `latency_offset_ms` in Schritten von
-20–50 ms verstellen, bis nichts mehr doppelt klingt. Beim Echo 2 mit Sonos
-passten **−120 ms**.
+Das Add-on hat eine eigene Seite **„AirPlay Sync“** in der HA-Seitenleiste
+bzw. unter „Web-UI öffnen“. Dort misst es per Mikrofon den Versatz einer
+Zone gegenüber einem HomePod oder einer Sonos und stellt ihn automatisch ein.
+
+1. Den **Klick-Track** (`sync-click.wav`) auf der Seite herunterladen.
+2. Ihn per AirPlay auf die Gruppe aus **Zone + Referenz-Lautsprecher**
+   abspielen, z. B. mit der Musik-App am Mac oder iPhone.
+3. Das Gerät mit der Seite **ungefähr gleich weit von beiden** Lautsprechern
+   hinlegen, beide etwa gleich laut. Dann auf **Messen** tippen. Das dauert
+   etwa 20 Sekunden.
+4. Die Seite schaltet die Zone erst stumm (nur die Referenz klickt), dann
+   wieder an (beide klicken), und berechnet daraus den Versatz auf etwa 1–2 ms
+   genau.
+5. **Übernehmen & speichern**: Der neue Wert wirkt sofort und wird in den
+   Add-on-Optionen gespeichert. Zur Kontrolle einfach nochmal messen.
+
+Hinweise:
+- Der Browser gibt das Mikrofon nur über **HTTPS** frei, also z. B. über die
+  externe HA-Adresse. Klappt es nicht, die Seite über „In neuem Tab öffnen“
+  aufrufen.
+- Jeder Meter Abstandsunterschied zum Mikrofon verfälscht um etwa 3 ms.
+  Deshalb das Gerät in die Mitte legen.
+- Von Hand geht es auch: `latency_offset_ms` in Schritten von 20–50 ms
+  verstellen, bis Klatschen oder Schlagzeug nicht mehr doppelt klingt. Auf
+  der Seite gibt es dafür auch ±-Knöpfe, die sofort wirken.
+
+### Messwerte (Info)
+
+Gemessene bzw. abgehörte `latency_offset_ms`-Werte als Orientierung. Die
+Einmessung ersetzt sie. Weitere Werte gern per Issue melden.
+
+| Lautsprecher | Software | Referenz | `latency_offset_ms` | Methode | Datum |
+|---|---|---|---|---|---|
+| Echo 2 (radar) | echo-dot-assist 2026.11.18 | Sonos | **−120** | Gehör | 26.11.2026 |
+| Echo Dot 2 (biscuit) | echo-dot-assist | – | *noch offen* | – | – |
+| Echo Dot 3 (donut) | echo-dot-assist | – | *noch offen* | – | – |
+| Echo Show 8 (crown) | echo-dot-assist | – | *noch offen* | – | – |
 
 ### Hinweise
 
@@ -156,7 +188,7 @@ iPhone ──AirPlay 2──► shairport-sync (per zone) ──PCM──► bri
    `https://github.com/TWIX99b/ha-airplay-sendspin`.
 2. Install "AirPlay 2 → Sendspin Bridge". The first build takes a few
    minutes because shairport-sync and nqptp are compiled.
-3. Configure (see the example above) and start it.
+3. Configure (see the example in the German section) and start it.
 
 ### Options
 
@@ -169,12 +201,43 @@ iPhone ──AirPlay 2──► shairport-sync (per zone) ──PCM──► bri
 | `zones[].pairing_token` / `token_entity` | Enter the token directly **or** read it from an HA entity. |
 | `zones[].latency_offset_ms` | Per-zone fine tuning: + = later, − = earlier. |
 
-### Sync tuning
+### Automatic calibration
 
-Play the speaker together with a HomePod or Sonos, e.g. a track with clear
-claps or drums like "We Will Rock You", and stand in between. Adjust
-`latency_offset_ms` in 20–50 ms steps until nothing sounds doubled. An Echo 2
-with a Sonos needed **−120 ms**.
+The add-on has its own page **"AirPlay Sync"** in the HA sidebar or via
+"Open Web UI". It uses the microphone to measure a zone's offset against a
+HomePod or Sonos and sets it automatically.
+
+1. Download the **click track** (`sync-click.wav`) from the page.
+2. Play it via AirPlay to the group **zone + reference speaker**, e.g. with
+   the Music app on Mac or iPhone.
+3. Put the device showing the page **roughly the same distance from both**
+   speakers, both at about the same volume. Then tap **Measure**. It takes
+   about 20 seconds.
+4. The page first mutes the zone (only the reference clicks), then unmutes it
+   (both click), and computes the offset to within about 1–2 ms.
+5. **Apply & save**: the new value takes effect immediately and is saved in
+   the add-on options. Measure again to verify.
+
+Notes:
+- Browsers only allow the microphone over **HTTPS**, e.g. via your external
+  HA address. If it doesn't work, use "Open in new tab".
+- Every metre of distance difference to the microphone skews the result by
+  about 3 ms, so place the device in between.
+- Manual tuning also works: adjust `latency_offset_ms` in 20–50 ms steps
+  until claps or drums no longer sound doubled. The page has ± buttons for
+  this too, which take effect immediately.
+
+### Measured values (info)
+
+Measured or by-ear `latency_offset_ms` values as a starting point. The
+calibration replaces them. Feel free to report more values via an issue.
+
+| Speaker | Software | Reference | `latency_offset_ms` | Method | Date |
+|---|---|---|---|---|---|
+| Echo 2 (radar) | echo-dot-assist 2026.11.18 | Sonos | **−120** | by ear | 2026-11-26 |
+| Echo Dot 2 (biscuit) | echo-dot-assist | – | *open* | – | – |
+| Echo Dot 3 (donut) | echo-dot-assist | – | *open* | – | – |
+| Echo Show 8 (crown) | echo-dot-assist | – | *open* | – | – |
 
 ### Notes
 

@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AirPlay Sync</title>
+<style>
+  :root { --bg:#f6f7fb; --card:#fff; --fg:#1d2230; --muted:#667085; --acc:#3a46dc; --ok:#1f9d55; --warn:#c2410c; --bd:#e4e7ee; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111318; --card:#1b1e26; --fg:#e8eaf0; --muted:#9aa3b5; --acc:#7c86ff; --bd:#2b303c; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:720px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { font-size:1.4rem; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--bd); border-radius:14px; padding:16px 18px; margin:14px 0; }
+  .card h2 { font-size:1.05rem; margin:0 0 10px; }
+  ol { margin:0; padding-left:1.2em; } li { margin:4px 0; }
+  select, button { font:inherit; border-radius:10px; }
+  select { padding:8px 10px; border:1px solid var(--bd); background:var(--card); color:var(--fg); min-width:220px; }
+  button { padding:10px 16px; border:0; background:var(--acc); color:#fff; cursor:pointer; margin:4px 6px 4px 0; }
+  button.sec { background:transparent; color:var(--acc); border:1px solid var(--acc); }
+  button:disabled { opacity:.45; cursor:default; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:99px; font-size:.85rem; margin-left:8px; }
+  .on { background:#dcfce7; color:#166534; } .off { background:#fde2e2; color:#991b1b; }
+  .bar { height:10px; background:var(--bd); border-radius:99px; overflow:hidden; margin:10px 0 4px; }
+  .bar > div { height:100%; width:0; background:var(--acc); transition:width .25s linear; }
+  .big { font-size:1.6rem; font-weight:650; margin:6px 0; }
+  .muted { color:var(--muted); font-size:.92rem; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); }
+  .row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  code { background:var(--bd); padding:1px 6px; border-radius:6px; }
+  a { color:var(--acc); }
+</style>
+</head>
+<body>
+<main>
+  <h1 data-t="title"></h1>
+  <p class="sub" data-t="subtitle"></p>
+
+  <div class="card" id="secure" hidden>
+    <h2 data-t="noMicTitle"></h2>
+    <p data-t="noMicText"></p>
+    <button class="sec" onclick="window.open(location.href,'_blank')" data-t="newTab"></button>
+  </div>
+
+  <div class="card">
+    <h2 data-t="step1"></h2>
+    <div class="row">
+      <select id="zone"></select>
+      <span id="state" class="pill off"></span>
+    </div>
+    <p class="muted" id="current"></p>
+  </div>
+
+  <div class="card">
+    <h2 data-t="step2"></h2>
+    <ol>
+      <li><span data-t="i1"></span> <a href="sync-click.wav" download data-t="download"></a></li>
+      <li data-t="i2"></li>
+      <li data-t="i3"></li>
+      <li data-t="i4"></li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2 data-t="step3"></h2>
+    <button id="start" data-t="start"></button>
+    <div class="bar"><div id="prog"></div></div>
+    <div class="muted" id="phase"></div>
+  </div>
+
+  <div class="card" id="result" hidden>
+    <h2 data-t="result"></h2>
+    <div class="big" id="resBig"></div>
+    <div id="resText"></div>
+    <div class="muted" id="resQual"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="apply" data-t="apply"></button>
+      <button class="sec" id="again" data-t="again"></button>
+    </div>
+    <div class="muted" id="applied"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-t="manual"></h2>
+    <div class="row">
+      <button class="sec" data-step="-20">−20 ms</button>
+      <button class="sec" data-step="-5">−5 ms</button>
+      <button class="sec" data-step="5">+5 ms</button>
+      <button class="sec" data-step="20">+20 ms</button>
+      <button id="saveManual" data-t="save"></button>
+    </div>
+    <p class="muted" data-t="manualHint"></p>
+  </div>
+</main>
+
+<script>
+const DE = navigator.language.toLowerCase().startsWith('de');
+const T = DE ? {
+  title: 'AirPlay Sync – Einmessen',
+  subtitle: 'Misst per Mikrofon, wie weit eine Zone gegenüber einem HomePod/Sonos versetzt ist, und stellt den Versatz automatisch ein.',
+  noMicTitle: 'Kein Mikrofonzugriff',
+  noMicText: 'Der Browser gibt das Mikrofon nur über HTTPS frei, z. B. über deine externe HA-Adresse. Öffne die Seite zur Sicherheit in einem eigenen Tab.',
+  newTab: 'In neuem Tab öffnen',
+  step1: '1 · Zone wählen', playing: 'spielt über AirPlay', idle: 'spielt gerade nicht',
+  current: (o) => `Aktueller Feinabgleich: ${o > 0 ? '+' : ''}${o} ms`,
+  step2: '2 · Vorbereiten',
+  i1: 'Klick-Track herunterladen:', download: 'sync-click.wav',
+  i2: 'Den Track per AirPlay auf die Gruppe aus dieser Zone und einem Referenz-Lautsprecher (HomePod/Sonos) abspielen, z. B. mit der Musik-App am Mac oder iPhone.',
+  i3: 'Das Gerät mit dieser Seite ungefähr gleich weit von beiden Lautsprechern entfernt hinlegen, ruhig sein.',
+  i4: 'Beide Lautsprecher etwa gleich laut einstellen. Wenn oben „spielt über AirPlay“ steht, auf Messen tippen.',
+  step3: '3 · Messen (ca. 20 Sekunden)', start: 'Messen',
+  phA: 'Phase 1/2: Zone stumm – nur der Referenz-Lautsprecher klickt …',
+  phB: 'Phase 2/2: Zone wieder an – beide klicken …',
+  analyse: 'Werte aus …',
+  result: 'Ergebnis',
+  late: (d) => `Die Zone ist ${d} ms zu spät`,
+  early: (d) => `Die Zone ist ${d} ms zu früh`,
+  insync: 'Die Zone ist synchron (±3 ms)',
+  suggest: (n) => `Neuer Feinabgleich: <b>${n > 0 ? '+' : ''}${n} ms</b>`,
+  qual: (a, b) => `Signalqualität: Referenz ${a.toFixed(1)} · Zone ${b.toFixed(1)} (gut: Referenz über 4, Zone über 8)`,
+  bad: 'Messung unsicher – lauter abspielen, Gerät näher oder Umgebung ruhiger und nochmal messen.',
+  apply: 'Übernehmen & speichern', again: 'Nochmal messen',
+  applied: (n, s) => `Übernommen: ${n > 0 ? '+' : ''}${n} ms${s ? ' – gespeichert.' : ' – live aktiv, Speichern hat nicht geklappt.'} Zur Kontrolle einfach nochmal messen.`,
+  manual: 'Von Hand nachjustieren',
+  manualHint: 'Wirkt sofort beim Abspielen. Plus = Zone später, minus = früher.',
+  save: 'Speichern',
+  notPlaying: 'Die Zone spielt gerade nicht über AirPlay – erst den Klick-Track starten.',
+  micErr: 'Mikrofon nicht verfügbar: ',
+} : {
+  title: 'AirPlay Sync – Calibration',
+  subtitle: 'Uses the microphone to measure how far a zone is off compared to a HomePod/Sonos and sets the offset automatically.',
+  noMicTitle: 'No microphone access',
+  noMicText: 'Browsers only allow the microphone over HTTPS, e.g. via your external HA address. To be safe, open the page in its own tab.',
+  newTab: 'Open in new tab',
+  step1: '1 · Choose zone', playing: 'playing via AirPlay', idle: 'not playing',
+  current: (o) => `Current fine offset: ${o > 0 ? '+' : ''}${o} ms`,
+  step2: '2 · Prepare',
+  i1: 'Download the click track:', download: 'sync-click.wav',
+  i2: 'Play it via AirPlay to a group of this zone and a reference speaker (HomePod/Sonos), e.g. with the Music app on Mac or iPhone.',
+  i3: 'Put the device showing this page roughly the same distance from both speakers; keep quiet.',
+  i4: 'Set both speakers to roughly the same volume. When the status above says "playing via AirPlay", tap Measure.',
+  step3: '3 · Measure (about 20 s)', start: 'Measure',
+  phA: 'Phase 1/2: zone muted – only the reference speaker clicks …',
+  phB: 'Phase 2/2: zone back on – both click …',
+  analyse: 'Analysing …',
+  result: 'Result',
+  late: (d) => `The zone is ${d} ms late`,
+  early: (d) => `The zone is ${d} ms early`,
+  insync: 'The zone is in sync (±3 ms)',
+  suggest: (n) => `New fine offset: <b>${n > 0 ? '+' : ''}${n} ms</b>`,
+  qual: (a, b) => `Signal quality: reference ${a.toFixed(1)} · zone ${b.toFixed(1)} (good: reference above 4, zone above 8)`,
+  bad: 'Measurement uncertain – play louder, move closer or reduce noise and measure again.',
+  apply: 'Apply & save', again: 'Measure again',
+  applied: (n, s) => `Applied: ${n > 0 ? '+' : ''}${n} ms${s ? ' – saved.' : ' – active now, saving failed.'} Measure again to verify.`,
+  manual: 'Adjust manually',
+  manualHint: 'Takes effect immediately while playing. Plus = zone later, minus = earlier.',
+  save: 'Save',
+  notPlaying: 'The zone is not playing via AirPlay – start the click track first.',
+  micErr: 'Microphone not available: ',
+};
+document.documentElement.lang = DE ? 'de' : 'en';
+document.querySelectorAll('[data-t]').forEach(el => { const v = T[el.dataset.t]; if (typeof v === 'string') el.textContent = v; });
+
+const $ = (id) => document.getElementById(id);
+let zones = [], suggested = null;
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const api = (path, body) => fetch(path, body === undefined ? {} : {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+
+if (!window.isSecureContext || !navigator.mediaDevices) $('secure').hidden = false;
+
+function zone() { return zones.find(z => String(z.index) === $('zone').value); }
+
+async function refresh() {
+  try {
+    const r = await api('api/zones'); zones = await r.json();
+    const sel = $('zone'), keep = sel.value;
+    if (sel.options.length !== zones.length) {
+      sel.innerHTML = zones.map(z => `<option value="${z.index}">${z.name}</option>`).join('');
+      if (keep) sel.value = keep;
+    }
+    const z = zone(); if (!z) return;
+    $('state').textContent = z.playing ? T.playing : T.idle;
+    $('state').className = 'pill ' + (z.playing ? 'on' : 'off');
+    $('current').textContent = T.current(z.offset_ms);
+  } catch (e) { /* ignore, try again */ }
+}
+$('zone').onchange = refresh;
+refresh(); setInterval(refresh, 2000);
+
+// ---------- Measurement ----------
+const BINS = 1000;      // 1 ms resolution over the 1 s click period
+const ONSET_WIN = 40;   // ms before the maximum: direct sound comes before reflections
+const ONSET_REL = 0.3;  // onset = first crossing of 30 % of the peak
+let GUARD_S = 2.5;      // a mute becomes audible only after the bridge buffer
+let PHASE_S = 9.0;      // duration of one phase
+
+function envelope(x, sr) {
+  const n = x.length, d = new Float32Array(n);
+  let prev = 0;
+  for (let i = 0; i < n; i++) { d[i] = Math.abs(x[i] - prev); prev = x[i]; }
+  const w = Math.max(1, Math.round(sr * 0.0005)), out = new Float32Array(n);
+  let acc = 0;
+  for (let i = 0; i < n; i++) { acc += d[i]; if (i >= w) acc -= d[i - w]; out[i] = acc / w; }
+  return out;
+}
+function fold(env, sr, a, b) {
+  const p = new Float64Array(BINS), c = new Float64Array(BINS);
+  for (let i = a; i < b; i++) { const k = Math.floor(((i % sr) / sr) * BINS); p[k] += env[i]; c[k]++; }
+  for (let k = 0; k < BINS; k++) p[k] = c[k] ? p[k] / c[k] : 0;
+  const s = new Float64Array(BINS);   // circular smoothing ±2 bins
+  for (let k = 0; k < BINS; k++) { let v = 0; for (let j = -2; j <= 2; j++) v += p[(k + j + BINS) % BINS]; s[k] = v / 5; }
+  return s;
+}
+function argmax(a) { let m = 0; for (let i = 1; i < a.length; i++) if (a[i] > a[m]) m = i; return m; }
+function median(a) { const s = Array.from(a).sort((x, y) => x - y); return s[s.length >> 1]; }
+function onset(P) {
+  const m = argmax(P), base = median(P), thr = base + ONSET_REL * (P[m] - base);
+  for (let j = m - ONSET_WIN; j <= m; j++) { const k = (j + BINS) % BINS; if (P[k] >= thr) return k; }
+  return m;
+}
+function analyse(x, sr, markA, markB, end) {
+  const env = envelope(x, sr);
+  const A = fold(env, sr, markA + Math.round(GUARD_S * sr), markB);
+  const B = fold(env, sr, markB + Math.round(GUARD_S * sr), end);
+  const D = new Float64Array(BINS);
+  for (let k = 0; k < BINS; k++) D[k] = B[k] - A[k];   // = contribution of the zone
+  const s = onset(A), e = onset(D);
+  const qa = A[argmax(A)] / (median(A) + 1e-12);
+  const qd = D[argmax(D)] / (median(D.map(Math.abs)) + 1e-12);
+  let d = ((e - s) * 1000) / BINS;                     // ms, zone − reference
+  if (d > 500) d -= 1000; if (d <= -500) d += 1000;
+  return { delay: Math.round(d), qa, qd };
+}
+
+async function measure() {
+  const z = zone();
+  $('result').hidden = true; $('applied').textContent = '';
+  if (!z || !z.playing) { alert(T.notPlaying); return; }
+  GUARD_S = z.lead_ms / 1000 + 1.0;          // bridge delay + safety margin
+  PHASE_S = Math.max(9.0, GUARD_S + 6.5);    // at least ~6 clicks per phase
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: {
+      echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+  } catch (e) { alert(T.micErr + e.message); return; }
+  $('start').disabled = true;
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  await ctx.resume();
+  const sr = ctx.sampleRate, src = ctx.createMediaStreamSource(stream);
+  const proc = ctx.createScriptProcessor(4096, 1, 1);
+  const chunks = []; let count = 0;
+  proc.onaudioprocess = (ev) => { const d = new Float32Array(ev.inputBuffer.getChannelData(0)); chunks.push(d); count += d.length; };
+  src.connect(proc); proc.connect(ctx.destination);
+
+  const total = 2 * PHASE_S * 1000, t0 = performance.now();
+  const tick = setInterval(() => { $('prog').style.width = Math.min(100, (performance.now() - t0) / total * 100) + '%'; }, 200);
+  let markA = 0, markB = 0, end = 0;
+  try {
+    $('phase').textContent = T.phA;
+    await api(`api/zones/${z.index}/mute`, { mute: true }); markA = count;
+    await sleep(PHASE_S * 1000);
+    $('phase').textContent = T.phB;
+    await api(`api/zones/${z.index}/mute`, { mute: false }); markB = count;
+    await sleep(PHASE_S * 1000);
+    end = count;
+  } finally {
+    await api(`api/zones/${z.index}/mute`, { mute: false });
+    clearInterval(tick); proc.disconnect(); src.disconnect();
+    stream.getTracks().forEach(t => t.stop()); await ctx.close();
+    $('start').disabled = false;
+  }
+  $('phase').textContent = T.analyse;
+  const x = new Float32Array(end); let o = 0;
+  for (const c of chunks) { if (o >= end) break; x.set(c.subarray(0, Math.min(c.length, end - o)), o); o += c.length; }
+  const r = analyse(x, sr, markA, markB, end);
+  $('phase').textContent = '';
+  const good = r.qa > 4 && r.qd > 8;
+  suggested = z.offset_ms - r.delay;
+  $('resBig').textContent = Math.abs(r.delay) <= 3 ? T.insync : (r.delay > 0 ? T.late(r.delay) : T.early(-r.delay));
+  $('resBig').className = 'big ' + (good ? 'ok' : 'warn');
+  $('resText').innerHTML = T.suggest(suggested);
+  $('resQual').textContent = T.qual(r.qa, r.qd) + (good ? '' : ' — ' + T.bad);
+  $('apply').disabled = !good || Math.abs(r.delay) <= 3;
+  $('result').hidden = false;
+}
+
+async function setOffset(value, save) {
+  const z = zone(); if (!z) return null;
+  const r = await api(`api/zones/${z.index}/offset`, { offset_ms: value, save });
+  const j = await r.json(); await refresh(); return j;
+}
+$('start').onclick = measure;
+$('again').onclick = measure;
+$('apply').onclick = async () => {
+  if (suggested === null) return;
+  const j = await setOffset(Math.max(-1000, Math.min(1000, suggested)), true);
+  if (j) $('applied').textContent = T.applied(j.offset_ms, j.saved);
+};
+document.querySelectorAll('[data-step]').forEach(b => b.onclick = async () => {
+  const z = zone(); if (!z) return;
+  await setOffset(Math.max(-1000, Math.min(1000, z.offset_ms + Number(b.dataset.step))), false);
+});
+$('saveManual').onclick = async () => { const z = zone(); if (z) await setOffset(z.offset_ms, true); };
+</script>
+</body>
+</html>

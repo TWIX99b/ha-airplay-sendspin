@@ -37,6 +37,7 @@ from aiosendspin.noise import (
     decode_psk_token,
 )
 from aiosendspin.noise.pairing import PairingAttempt
+from web import start_web
 
 try:  # the package may or may not re-export these
     from aiosendspin.server import SendspinServer
@@ -310,6 +311,31 @@ class Zone:
         self.netns_exec = NETNS_FILE.read_text().split() if NETNS_FILE.exists() else []
         self.client_id: str | None = None
         self.log = logging.getLogger(f"zone.{cfg.slug}")
+        # Calibration (web UI): status and live intervention
+        self.streaming = False
+        self.cal_mute = False
+        self._force_resync = False
+
+    def set_offset(self, offset_ms: int) -> None:
+        """Change the fine offset immediately (takes effect at once)."""
+        self.cfg.latency_offset_ms = int(offset_ms)
+        self._force_resync = True
+        self.log.info("latency_offset_ms is now %+d ms", offset_ms)
+
+    def lead_ms(self) -> int:
+        """Delay from the bridge to the speaker (for the calibration page)."""
+        return self._lead_us() // 1000
+
+    def _lead_us(self) -> int:
+        """Distance from arrival to play time.
+
+        shairport-sync hands out audio (latency_ms + backend buffer) early,
+        so the Echo has to play it that much later. Positive offset = Echo
+        plays later, negative = earlier.
+        """
+        return (
+            self.latency_ms + int(SPS_BUFFER_S * 1000) + self.cfg.latency_offset_ms
+        ) * 1000
 
     async def run(self) -> None:
         token = self.cfg.pairing_token or await fetch_token_from_ha(
@@ -424,12 +450,7 @@ class Zone:
             return
 
         stream = group.start_stream()
-        # shairport-sync hands out audio (latency_ms + backend buffer) early,
-        # so the Echo has to play it that much later.
-        # Positive offset = Echo plays later, negative = earlier.
-        lead_us = (
-            self.latency_ms + int(SPS_BUFFER_S * 1000) + self.cfg.latency_offset_ms
-        ) * 1000
+        self.streaming = True
         next_ts: int | None = None
         err_avg = 0.0
         sent = resyncs = dropped = 0
@@ -450,7 +471,10 @@ class Zone:
 
                 # Arrival time (monotonic) → Sendspin server clock
                 now_srv = stream.now_us()
-                target = arrival + (now_srv - mono_us()) + lead_us
+                target = arrival + (now_srv - mono_us()) + self._lead_us()
+                if self._force_resync:  # offset changed via the web UI
+                    self._force_resync = False
+                    next_ts = None
 
                 if target < now_srv + MIN_LEAD_US:
                     # Arrived during the takeover and is already too late
@@ -477,7 +501,10 @@ class Zone:
                         err_avg = 0.0
 
                 if next_ts is not None:
-                    stream.prepare_audio(b"".join(parts), PCM_FORMAT)
+                    pcm = b"".join(parts)
+                    if self.cal_mute:  # calibration: silent, timing unchanged
+                        pcm = bytes(len(pcm))
+                    stream.prepare_audio(pcm, PCM_FORMAT)
                     await stream.commit_audio(play_start_us=next_ts)
                     next_ts += CHUNK_US * len(parts)
                     sent += len(parts)
@@ -498,6 +525,8 @@ class Zone:
         except Exception as err:  # noqa: BLE001
             self.log.exception("Streaming error: %s", err)
         finally:
+            self.streaming = False
+            self.cal_mute = False
             with contextlib.suppress(Exception):
                 await group.stop()
             self.side.release(self.cfg)
@@ -541,7 +570,9 @@ async def main() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
     tasks = [asyncio.create_task(z.run(), name=z.cfg.slug) for z in zones]
+    web_runner = await start_web(zones)
     await stop.wait()
+    await web_runner.cleanup()
     for t in tasks:
         t.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)

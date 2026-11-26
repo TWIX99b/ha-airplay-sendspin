@@ -30,8 +30,8 @@ gruppieren und spielen synchron.
 Oder: Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories →
 `https://github.com/TWIX99b/ha-airplay-sendspin`
 
-Konfiguration und Abgleich: siehe
-[DOCS.md](airplay2_sendspin_bridge/DOCS.md).
+Konfiguration, **automatische Einmessung per Mikrofon** und Messwerte:
+siehe [DOCS.md](airplay2_sendspin_bridge/DOCS.md).
 
 ### So funktioniert es
 
@@ -70,8 +70,8 @@ Sonos and other AirPlay 2 speakers, and they play in sync.
 Or: Settings → Add-ons → Add-on Store → ⋮ → Repositories →
 `https://github.com/TWIX99b/ha-airplay-sendspin`
 
-Configuration and sync tuning: see
-[DOCS.md](airplay2_sendspin_bridge/DOCS.md).
+Configuration, **automatic microphone calibration** and measured values:
+see [DOCS.md](airplay2_sendspin_bridge/DOCS.md).
 
 ### How it works
 
