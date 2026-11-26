@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1
+
+- Wording: "zone" is now called "speaker" ("Lautsprecher") on the page,
+  in the option texts and in the docs. The option key `zones` stays the
+  same, so existing configurations keep working.
+
 ## 0.4.0
 
 - **Speaker volume during AirPlay** (`speaker_volume`, default 100 %): the

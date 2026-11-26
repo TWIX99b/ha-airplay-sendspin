@@ -35,7 +35,7 @@ siehe [DOCS.md](airplay2_sendspin_bridge/DOCS.md).
 
 ### So funktioniert es
 
-Pro Zone läuft eine
+Pro Lautsprecher läuft eine
 [shairport-sync](https://github.com/mikebrady/shairport-sync)-Instanz
 (AirPlay 2, mit [nqptp](https://github.com/mikebrady/nqptp)). Alle laufen in
 einem eigenen Netzwerk-Namespace mit eigener IP, damit sie sich nicht mit
@@ -76,7 +76,7 @@ see [DOCS.md](airplay2_sendspin_bridge/DOCS.md).
 ### How it works
 
 One [shairport-sync](https://github.com/mikebrady/shairport-sync) instance
-(AirPlay 2, with [nqptp](https://github.com/mikebrady/nqptp)) runs per zone.
+(AirPlay 2, with [nqptp](https://github.com/mikebrady/nqptp)) runs per speaker.
 All of them run in their own network namespace with a dedicated IP, so they
 don't clash with Music Assistant on UDP 319/320. The bridge timestamps the
 PCM in the Sendspin clock and pushes it with

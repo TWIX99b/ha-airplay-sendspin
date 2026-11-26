@@ -21,12 +21,12 @@ gruppieren und spielen synchron.
 ### So funktioniert es
 
 ```
-iPhone ──AirPlay 2──► shairport-sync (pro Zone) ──PCM──► Bridge ──Sendspin──► Lautsprecher
+iPhone ──AirPlay 2──► shairport-sync (pro Lautsprecher) ──PCM──► Bridge ──Sendspin──► Lautsprecher
                          │ nqptp (PTP-Uhr)                  │ eigener Sendspin-Server
                          └─ netns „ap2“ mit eigener IP      └─ übernimmt ihn nur während AirPlay
 ```
 
-- Pro Zone läuft eine shairport-sync-Instanz im AirPlay-2-Modus. Die Bridge
+- Pro Lautsprecher läuft eine shairport-sync-Instanz im AirPlay-2-Modus. Die Bridge
   liest den Ton, versieht jedes Stück mit dem Zeitpunkt, an dem es gespielt
   werden soll, und schickt es per Sendspin an den Lautsprecher.
 - Startet AirPlay, übernimmt die Bridge den Lautsprecher. Music Assistant
@@ -46,7 +46,7 @@ iPhone ──AirPlay 2──► shairport-sync (pro Zone) ──PCM──► Bri
 - Pro Lautsprecher den **Sendspin-Pairing-Token**. Bei echo-dot-assist ist
   das die Entität „Sendspin pairing token“. Sie ist ab Werk deaktiviert und
   muss aktiviert werden.
-- iPhone, iPad und Mac müssen die Zonen per mDNS sehen. Liegen sie in einem
+- iPhone, iPad und Mac müssen die Lautsprecher per mDNS sehen. Liegen sie in einem
   anderen VLAN, muss die mDNS-Weiterleitung aktiv sein.
 
 ### Installation
@@ -82,28 +82,28 @@ zones:
 
 | Option | Bedeutung |
 |---|---|
-| `ap2_ip` | Eigene IP mit Präfix für die AirPlay-Zonen. Leer = Host-IP, dann kann es Konflikte mit Music Assistant geben. |
+| `ap2_ip` | Eigene IP mit Präfix für die AirPlay-Lautsprecher. Leer = Host-IP, dann kann es Konflikte mit Music Assistant geben. |
 | `latency_ms` | So früh gibt shairport-sync den Ton heraus, so spät spielt ihn der Lautsprecher. Höher = robuster gegen WLAN-Aussetzer. |
 | `volume_range_db` | Regelbereich der AirPlay-Lautstärke. 30 entspricht ungefähr HomePod und Sonos. Kleiner = in der Reglermitte lauter. |
 | `ignore_airplay_volume` | `true` = immer volle Lautstärke, geregelt wird nur am Lautsprecher. Dann `speaker_volume` herunterstellen. |
 | `speaker_volume` | Lautstärke des Lautsprechers selbst, solange AirPlay spielt (Standard 100 %). Danach kommt der alte Wert zurück, außer er wurde zwischendurch am Lautsprecher verstellt. `0` = nicht anfassen. |
 | `zones[].pairing_token` / `token_entity` | Token direkt eintragen **oder** aus einer HA-Entität lesen. |
-| `zones[].latency_offset_ms` | Feinabgleich pro Zone: + = später, − = früher. |
-| `zones[].volume_trim_db` | Lautstärke-Anpassung pro Zone, 0 bis −30 dB. Wird per Einmessung gesetzt. |
+| `zones[].latency_offset_ms` | Feinabgleich pro Lautsprecher: + = später, − = früher. |
+| `zones[].volume_trim_db` | Lautstärke-Anpassung pro Lautsprecher, 0 bis −30 dB. Wird per Einmessung gesetzt. |
 
 ### Automatisch einmessen
 
 Das Add-on hat eine eigene Seite **„AirPlay Sync“** in der HA-Seitenleiste
-bzw. unter „Web-UI öffnen“. Dort misst es per Mikrofon den Versatz einer
-Zone gegenüber einem HomePod oder einer Sonos und stellt ihn automatisch ein.
+bzw. unter „Web-UI öffnen“. Dort misst es per Mikrofon den Versatz eines
+Lautsprechers gegenüber einem HomePod oder einer Sonos und stellt ihn automatisch ein.
 
 1. Den **Klick-Track** (`sync-click.wav`) auf der Seite herunterladen.
-2. Ihn per AirPlay auf die Gruppe aus **Zone + Referenz-Lautsprecher**
+2. Ihn per AirPlay auf die Gruppe aus **Lautsprecher + Referenz (HomePod/Sonos)**
    abspielen, z. B. mit der Musik-App am Mac oder iPhone.
 3. Das Gerät mit der Seite **ungefähr gleich weit von beiden** Lautsprechern
    hinlegen, beide etwa gleich laut. Dann auf **Messen** tippen. Das dauert
    etwa 20 Sekunden.
-4. Die Seite schaltet die Zone erst stumm (nur die Referenz klickt), dann
+4. Die Seite schaltet den Lautsprecher erst stumm (nur die Referenz klickt), dann
    wieder an (beide klicken), und berechnet daraus den Versatz auf etwa 1–2 ms
    genau.
 5. **Übernehmen & speichern**: Der neue Wert wirkt sofort und wird in den
@@ -129,13 +129,13 @@ Zeit einmessen.
 2. In iOS beide Lautsprecher der Gruppe auf **dieselbe Einzel-Lautstärke**
    stellen. Gerät in die Mitte legen, **Messen** (etwa 30 Sekunden).
 3. Der Track rauscht 1,5 s und ist dann 3,5 s still. Während des Rauschens
-   bleibt die Zone stumm, in der Stille spielt das Add-on dasselbe Rauschen
-   auf der Zone. So misst die Seite beide Lautsprecher einzeln und berechnet
+   bleibt der Lautsprecher stumm, in der Stille spielt das Add-on dasselbe
+   Rauschen auf dem Lautsprecher. So misst die Seite beide Lautsprecher einzeln und berechnet
    den Unterschied, simuliert auf etwa ±0,5 dB genau.
 4. **Übernehmen & speichern** setzt `volume_trim_db`. Von Hand geht es mit
    den ±-dB-Knöpfen.
 
-Lauter als 0 dB geht nicht. Ist die Zone dann immer noch leiser, zuerst
+Lauter als 0 dB geht nicht. Ist der Lautsprecher dann immer noch leiser, zuerst
 `speaker_volume` prüfen (Standard 100 %), sonst den Referenz-Lautsprecher in
 iOS etwas leiser stellen. Gleich laut heißt nicht gleicher Klang: Ein Echo
 hat weniger Bass als eine Sonos.
@@ -154,7 +154,7 @@ denn die Lautstärke hängt auch von Raum und Referenz ab. Weitere Werte gern pe
 
 ### Hinweise
 
-- Das Symbol im AirPlay-Menü bestimmt iOS selbst. Die Zonen erscheinen als
+- Das Symbol im AirPlay-Menü bestimmt iOS selbst. Die Lautsprecher erscheinen als
   normaler Lautsprecher.
 - Pausiert AirPlay, bleibt der Lautsprecher noch `idle_timeout_s` Sekunden
   belegt.
@@ -180,12 +180,12 @@ play in sync.
 ### How it works
 
 ```
-iPhone ──AirPlay 2──► shairport-sync (per zone) ──PCM──► bridge ──Sendspin──► speaker
+iPhone ──AirPlay 2──► shairport-sync (per speaker) ──PCM──► bridge ──Sendspin──► speaker
                          │ nqptp (PTP clock)                │ own Sendspin server
                          └─ netns "ap2" with own IP         └─ takes it over only during AirPlay
 ```
 
-- One shairport-sync instance runs in AirPlay 2 mode per zone. The bridge
+- One shairport-sync instance runs in AirPlay 2 mode per speaker. The bridge
   reads the audio, stamps each chunk with the time it should play, and sends
   it to the speaker over Sendspin.
 - When AirPlay starts, the bridge takes the speaker over. Music Assistant is
@@ -204,7 +204,7 @@ iPhone ──AirPlay 2──► shairport-sync (per zone) ──PCM──► bri
 - A **Sendspin pairing token** for each speaker. With echo-dot-assist this is
   the "Sendspin pairing token" entity. It is disabled by default and must be
   enabled.
-- iPhone, iPad and Mac must see the zones via mDNS. If they are on another
+- iPhone, iPad and Mac must see the speakers via mDNS. If they are on another
   VLAN, mDNS forwarding has to be on.
 
 ### Installation
@@ -219,28 +219,28 @@ iPhone ──AirPlay 2──► shairport-sync (per zone) ──PCM──► bri
 
 | Option | Meaning |
 |---|---|
-| `ap2_ip` | Dedicated IP with prefix for the AirPlay zones. Empty = host IP, which can clash with Music Assistant. |
+| `ap2_ip` | Dedicated IP with prefix for the AirPlay speakers. Empty = host IP, which can clash with Music Assistant. |
 | `latency_ms` | How early shairport-sync releases audio and how much later the speaker plays it. Higher = more robust against Wi-Fi dropouts. |
 | `volume_range_db` | AirPlay volume range. 30 roughly matches HomePod and Sonos. Smaller = louder mid-slider. |
 | `ignore_airplay_volume` | `true` = always full volume, loudness is set on the speaker only. Lower `speaker_volume` then. |
 | `speaker_volume` | Volume of the speaker itself while AirPlay plays (default 100 %). The old value is restored afterwards, unless it was changed on the speaker meanwhile. `0` = don't touch. |
 | `zones[].pairing_token` / `token_entity` | Enter the token directly **or** read it from an HA entity. |
-| `zones[].latency_offset_ms` | Per-zone fine tuning: + = later, − = earlier. |
-| `zones[].volume_trim_db` | Per-zone volume trim, 0 to −30 dB. Set by the calibration. |
+| `zones[].latency_offset_ms` | Per-speaker fine tuning: + = later, − = earlier. |
+| `zones[].volume_trim_db` | Per-speaker volume trim, 0 to −30 dB. Set by the calibration. |
 
 ### Automatic calibration
 
 The add-on has its own page **"AirPlay Sync"** in the HA sidebar or via
-"Open Web UI". It uses the microphone to measure a zone's offset against a
+"Open Web UI". It uses the microphone to measure a speaker's offset against a
 HomePod or Sonos and sets it automatically.
 
 1. Download the **click track** (`sync-click.wav`) from the page.
-2. Play it via AirPlay to the group **zone + reference speaker**, e.g. with
+2. Play it via AirPlay to the group **speaker + reference (HomePod/Sonos)**, e.g. with
    the Music app on Mac or iPhone.
 3. Put the device showing the page **roughly the same distance from both**
    speakers, both at about the same volume. Then tap **Measure**. It takes
    about 20 seconds.
-4. The page first mutes the zone (only the reference clicks), then unmutes it
+4. The page first mutes the speaker (only the reference clicks), then unmutes it
    (both click), and computes the offset to within about 1–2 ms.
 5. **Apply & save**: the new value takes effect immediately and is saved in
    the add-on options. Measure again to verify.
@@ -264,12 +264,12 @@ first.
 2. In iOS, set both speakers of the group to the **same individual volume**.
    Put the device in between, tap **Measure** (about 30 seconds).
 3. The track plays 1.5 s of noise, then 3.5 s of silence. During the noise
-   the zone stays silent; in the silence the add-on plays the same noise on
-   the zone. So the page measures both speakers separately and computes the
+   the speaker stays silent; in the silence the add-on plays the same noise
+   on the speaker. So the page measures both speakers separately and computes the
    difference, simulated to about ±0.5 dB.
 4. **Apply & save** sets `volume_trim_db`. The ± dB buttons adjust it by hand.
 
-Above 0 dB is not possible. If the zone is still quieter, check
+Above 0 dB is not possible. If the speaker is still quieter, check
 `speaker_volume` first (default 100 %), otherwise turn the reference speaker
 down a little in iOS. Equally loud doesn't mean equal sound: an Echo has less
 bass than a Sonos.
@@ -288,7 +288,7 @@ them, since volume also depends on the room and the reference. Feel free to repo
 
 ### Notes
 
-- iOS picks the icon in the AirPlay picker. The zones show up as a regular
+- iOS picks the icon in the AirPlay picker. They show up as a regular
   speaker.
 - When AirPlay pauses, the speaker stays taken for `idle_timeout_s` seconds.
 - iOS rebuilds the session when speakers are added or removed from a group.

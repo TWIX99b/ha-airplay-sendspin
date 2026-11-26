@@ -2,7 +2,7 @@ configuration:
   ap2_ip:
     name: Dedicated AirPlay IP
     description: >-
-      Free IP with prefix in HA's network, e.g. 192.168.1.240/24. nqptp and the AirPlay zones
+      Free IP with prefix in HA's network, e.g. 192.168.1.240/24. nqptp and the AirPlay speakers
       run here so they don't clash with Music Assistant on UDP 319/320.
       Requires a wired connection.
   ap2_gateway:
@@ -35,9 +35,9 @@ configuration:
   log_level:
     name: Log level
   zones:
-    name: Zones
+    name: Speakers
     description: >-
-      One zone per speaker: name (shown in AirPlay), host (IP), port
+      One entry per speaker: name (shown in AirPlay), host (IP), port
       (echo-dot-assist: 28928), path (/sendspin), pairing_token or token_entity
       (entity "Sendspin pairing token", must be enabled), latency_offset_ms
       (fine tuning, + = later), volume_trim_db (volume trim, 0 to −30 dB).
