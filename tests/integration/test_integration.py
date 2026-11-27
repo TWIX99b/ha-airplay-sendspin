@@ -37,6 +37,7 @@ async def setup(hass: HomeAssistant, addon) -> MockConfigEntry:
     entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+    await addon.wait_connected()
     return entry
 
 
@@ -91,6 +92,7 @@ async def test_hassio_discovery(hass: HomeAssistant, addon) -> None:
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
     assert entry.data[CONF_TOKEN] == "new"
+    await hass.async_block_till_done()  # the entry reloads with the new token
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 

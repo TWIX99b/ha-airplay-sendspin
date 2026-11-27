@@ -284,6 +284,12 @@ def load_token() -> str:
 
 async def announce_to_ha(token: str) -> None:
     """Tell Home Assistant about us: it offers to set up the integration."""
+    log.info(
+        "HA integration: normally found automatically. Manual setup: "
+        "host 127.0.0.1, port %d, token %s",
+        INGRESS_PORT,
+        token,
+    )
     sup = os.environ.get("SUPERVISOR_TOKEN")
     if not sup:
         return

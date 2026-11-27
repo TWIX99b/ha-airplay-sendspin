@@ -62,10 +62,21 @@ class FakeAddon:
         self.runner: web.AppRunner | None = None
         self.port = 0
 
+    async def wait_connected(self) -> None:
+        """The integration's WebSocket runs as a background task."""
+        for _ in range(100):
+            if self.sockets:
+                return
+            await asyncio.sleep(0.05)
+        raise AssertionError("integration did not open the WebSocket")
+
     async def push(self) -> None:
+        await self.wait_connected()
         msg = json.dumps({"type": "state", "zones": self.zones})
         for ws in list(self.sockets):
             await ws.send_str(msg)
+        # let the integration's background task read and apply it
+        await asyncio.sleep(0.2)
 
     async def start(self) -> None:
         @web.middleware

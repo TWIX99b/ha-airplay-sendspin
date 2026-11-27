@@ -36,6 +36,7 @@ class FakeZone:
             index=index,
             name=name,
             slug=name.lower().replace(" ", "_"),
+            key=name.lower().replace(" ", "_"),
             latency_offset_ms=-225,
             volume_trim_db=0.0,
             speaker_volume=None,
