@@ -93,6 +93,7 @@ def build_click_wav() -> bytes:
     return buf.getvalue()
 
 
+LEVEL_RATE = 48_000  # the bridge analyses this track at 48 kHz
 LEVEL_CYCLE_S = 5.0
 LEVEL_NOISE_S = 1.5
 
@@ -125,7 +126,7 @@ def _rbj(kind: str, f0: float, sr: int, q: float = 0.7071) -> tuple:
 def build_level_wav() -> bytes:
     """90 s: 1.5 s pink noise (200 Hz – 6 kHz, −18 dBFS RMS), 3.5 s silence."""
     rnd = random.Random(20261126)
-    n = int(CLICK_RATE * LEVEL_NOISE_S)
+    n = int(LEVEL_RATE * LEVEL_NOISE_S)
     b0 = b1 = b2 = b3 = b4 = b5 = b6 = 0.0
     pink = []
     for _ in range(n + 4800):  # Paul Kellet's pink-noise filter, 100 ms run-in
@@ -139,22 +140,22 @@ def build_level_wav() -> bytes:
         pink.append(b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362)
         b6 = w * 0.115926
     for kind, f0 in (("hp", 200), ("hp", 200), ("lp", 6000), ("lp", 6000)):
-        pink = _biquad(pink, *_rbj(kind, f0, CLICK_RATE))
+        pink = _biquad(pink, *_rbj(kind, f0, LEVEL_RATE))
     pink = pink[4800:]
     rms = math.sqrt(sum(v * v for v in pink) / n)
     gain = 32767 * 10 ** (-18 / 20) / rms
-    fade = int(CLICK_RATE * 0.02)
+    fade = int(LEVEL_RATE * 0.02)
     samples = []
     for i, v in enumerate(pink):
         env = min(1.0, i / fade, (n - 1 - i) / fade)
         samples.append(max(-32767, min(32767, int(v * gain * env))))
-    silence = b"\x00\x00" * (int(CLICK_RATE * LEVEL_CYCLE_S) - n)
+    silence = b"\x00\x00" * (int(LEVEL_RATE * LEVEL_CYCLE_S) - n)
     cycle = struct.pack(f"<{n}h", *samples) + silence
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)
-        wav.setframerate(CLICK_RATE)
+        wav.setframerate(LEVEL_RATE)
         wav.writeframes(cycle * int(CLICK_SECONDS / LEVEL_CYCLE_S))
     return buf.getvalue()
 
