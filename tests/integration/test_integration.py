@@ -172,13 +172,13 @@ async def test_attached_to_echo_device(hass: HomeAssistant, addon) -> None:
     echo_entry.add_to_hass(hass)
     device = dr.async_get(hass).async_get_or_create(
         config_entry_id=echo_entry.entry_id,
-        identifiers={("hassmic", "stube")},
-        name="OG Stube Satellit",
+        identifiers={("hassmic", "wohnzimmer")},
+        name="Wohnzimmer Satellit",
     )
     er.async_get(hass).async_get_or_create(
         "sensor",
         "hassmic",
-        "stube_token",
+        "wohnzimmer_token",
         suggested_object_id="stube_sendspin_pairing_token",
         device_id=device.id,
         config_entry=echo_entry,
