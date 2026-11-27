@@ -1,0 +1,92 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "AirPlay Bridge",
+        "description": "Normalerweise meldet sich das Add-on selbst und du bestätigst nur. Von Hand: Adresse und Port des Add-ons (unter Home Assistant OS 127.0.0.1 und 8099) und das Token aus dem Add-on-Log.",
+        "data": {
+          "host": "Adresse",
+          "port": "Port",
+          "token": "Token"
+        }
+      },
+      "hassio_confirm": {
+        "title": "AirPlay Bridge",
+        "description": "Die AirPlay-Lautsprecher des Add-ons {addon} in Home Assistant einrichten? Ihre Entitäten kommen an die Geräte der Echos."
+      },
+      "reauth_confirm": {
+        "title": "AirPlay Bridge",
+        "description": "Das Add-on akzeptiert das Token nicht mehr (z. B. neu installiert). Das neue Token aus dem Add-on-Log eintragen.",
+        "data": {
+          "token": "Token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Add-on nicht erreichbar. Läuft es?",
+      "invalid_auth": "Token nicht akzeptiert."
+    },
+    "abort": {
+      "already_configured": "AirPlay Bridge ist bereits eingerichtet.",
+      "reauth_successful": "Token aktualisiert."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "airplay": {
+        "name": "AirPlay"
+      }
+    },
+    "sensor": {
+      "track": {
+        "name": "AirPlay-Titel",
+        "state_attributes": {
+          "artist": {
+            "name": "Interpret"
+          },
+          "album": {
+            "name": "Album"
+          }
+        }
+      },
+      "dropouts": {
+        "name": "AirPlay-Aussetzer",
+        "state_attributes": {
+          "music_hours": {
+            "name": "Musik gespielt (h)"
+          },
+          "sessions": {
+            "name": "Wiedergaben"
+          }
+        }
+      }
+    },
+    "number": {
+      "offset": {
+        "name": "AirPlay-Versatz"
+      },
+      "trim": {
+        "name": "AirPlay-Lautstärke-Anpassung"
+      },
+      "airplay_volume": {
+        "name": "AirPlay-Lautstärke"
+      }
+    },
+    "switch": {
+      "night_mode": {
+        "name": "AirPlay-Nachtmodus"
+      }
+    },
+    "button": {
+      "test_tone": {
+        "name": "AirPlay-Test-Ton"
+      }
+    },
+    "image": {
+      "cover": {
+        "name": "AirPlay-Cover"
+      }
+    }
+  }
+}

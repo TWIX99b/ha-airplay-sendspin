@@ -1,0 +1,92 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "AirPlay Bridge",
+        "description": "Normally the add-on announces itself and you only confirm. Manual setup: address and port of the add-on (127.0.0.1 and 8099 on Home Assistant OS) and the token from the add-on log.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "token": "Token"
+        }
+      },
+      "hassio_confirm": {
+        "title": "AirPlay Bridge",
+        "description": "Set up the AirPlay speakers of the add-on {addon} in Home Assistant? Their entities are added to the Echos' devices."
+      },
+      "reauth_confirm": {
+        "title": "AirPlay Bridge",
+        "description": "The add-on no longer accepts the token (e.g. reinstalled). Enter the new token from the add-on log.",
+        "data": {
+          "token": "Token"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Add-on not reachable. Is it running?",
+      "invalid_auth": "Token not accepted."
+    },
+    "abort": {
+      "already_configured": "AirPlay Bridge is already set up.",
+      "reauth_successful": "Token updated."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "airplay": {
+        "name": "AirPlay"
+      }
+    },
+    "sensor": {
+      "track": {
+        "name": "AirPlay title",
+        "state_attributes": {
+          "artist": {
+            "name": "Artist"
+          },
+          "album": {
+            "name": "Album"
+          }
+        }
+      },
+      "dropouts": {
+        "name": "AirPlay dropouts",
+        "state_attributes": {
+          "music_hours": {
+            "name": "Music played (h)"
+          },
+          "sessions": {
+            "name": "Sessions"
+          }
+        }
+      }
+    },
+    "number": {
+      "offset": {
+        "name": "AirPlay sync offset"
+      },
+      "trim": {
+        "name": "AirPlay volume trim"
+      },
+      "airplay_volume": {
+        "name": "AirPlay volume"
+      }
+    },
+    "switch": {
+      "night_mode": {
+        "name": "AirPlay night mode"
+      }
+    },
+    "button": {
+      "test_tone": {
+        "name": "AirPlay test tone"
+      }
+    },
+    "image": {
+      "cover": {
+        "name": "AirPlay cover"
+      }
+    }
+  }
+}

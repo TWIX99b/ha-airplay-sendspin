@@ -32,6 +32,7 @@ import logging
 import math
 import os
 import random
+import secrets
 import struct
 import tempfile
 import time
@@ -51,6 +52,9 @@ log = logging.getLogger("web")
 
 INGRESS_PORT = 8099
 ALLOWED_PEERS = {"172.30.32.2", "127.0.0.1", "::1"}  # Supervisor ingress proxy
+INT_PREFIX = "/int/"  # API of the Home Assistant integration (token protected)
+TOKEN_FILE = Path("/data/integration_token")
+DISCOVERY_SERVICE = "airplay_bridge"  # = domain of the integration
 STATIC = Path(__file__).parent / "static"
 OPTIONS_FILE = Path("/data/options.json")
 
@@ -219,7 +223,122 @@ def cover_key(cover: bytes | None) -> str | None:
     return hashlib.sha1(cover).hexdigest()[:12] if cover else None
 
 
-def create_app(zones: list[Zone]) -> web.Application:
+def zone_state(z) -> dict:
+    """Everything the page and the integration show about one speaker."""
+    t = z.track
+    return {
+        "index": z.cfg.index,
+        "name": z.cfg.name,
+        "key": z.cfg.key,
+        "speakers": [
+            {
+                "label": link.cfg.label,
+                "host": link.cfg.host,
+                "channel": link.cfg.channel,
+                "paired": link.client_id is not None,
+                "token_entity": link.cfg.token_entity,
+            }
+            for link in z.links
+        ],
+        "track": (
+            {"title": t.title, "artist": t.artist, "album": t.album} if t else None
+        ),
+        "cover": cover_key(t.cover if t else None),
+        "offset_ms": z.cfg.latency_offset_ms,
+        "lead_ms": z.lead_ms(),
+        "trim_db": z.cfg.volume_trim_db,
+        "speaker_volume": z.echo_volume,
+        "speaker_volume_target": z.target_volume(),
+        "airplay_volume": z.cfg.speaker_volume,
+        "default_volume": z.default_volume,
+        "night_volume": z.cfg.night_volume,
+        "night_start": z.cfg.night_start,
+        "night_end": z.cfg.night_end,
+        "night_enabled": z.cfg.night_enabled,
+        "night_active": z.night_active(),
+        "model": z.model,
+        "manufacturer": z.manufacturer,
+        "stats": z.stats,
+        "dropouts": int(
+            z.stats.get("resyncs", 0) + z.stats.get("drops", 0) + z.stats.get("lost", 0)
+        ),
+        "playing": z.streaming,
+    }
+
+
+def load_token() -> str:
+    """Secret the integration needs for /int/ (created once, kept in /data)."""
+    try:
+        token = TOKEN_FILE.read_text(encoding="utf-8").strip()
+        if len(token) >= 32:
+            return token
+    except OSError:
+        pass
+    token = secrets.token_urlsafe(32)
+    try:
+        TOKEN_FILE.write_text(token, encoding="utf-8")
+    except OSError as err:
+        log.warning("Integration token not saved: %s", err)
+    return token
+
+
+async def announce_to_ha(token: str) -> None:
+    """Tell Home Assistant about us: it offers to set up the integration."""
+    sup = os.environ.get("SUPERVISOR_TOKEN")
+    if not sup:
+        return
+    config = {"host": "127.0.0.1", "port": INGRESS_PORT, "token": token}
+    try:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                "http://supervisor/discovery",
+                headers={"Authorization": f"Bearer {sup}"},
+                json={"service": DISCOVERY_SERVICE, "config": config},
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp,
+        ):
+            if resp.status == 200:
+                log.info(
+                    "Announced to Home Assistant (integration '%s')", DISCOVERY_SERVICE
+                )
+            else:
+                log.warning(
+                    "Discovery failed: HTTP %s %s", resp.status, await resp.text()
+                )
+    except (aiohttp.ClientError, TimeoutError) as err:
+        log.warning("Discovery failed: %s", err)
+
+
+ALLOWED_SETTINGS = {
+    "latency_offset_ms",
+    "volume_trim_db",
+    "speaker_volume",
+    "night_enabled",
+}
+
+
+async def update_zone_settings(zone, changes: dict) -> dict:
+    """Validate, save and apply live changes of one speaker (no restart)."""
+    opts = read_options()
+    old = opts["zones"][zone.cfg.index]
+    new = dict(old)
+    for key, value in changes.items():
+        if key not in ALLOWED_SETTINGS:
+            raise ValueError(f"unknown setting {key}")
+        if value is None:
+            new.pop(key, None)
+        else:
+            new[key] = value
+    cleaned = speakers.clean_zone({**new, "orig": zone.cfg.index}, old)
+    opts["zones"][zone.cfg.index] = cleaned
+    if not await save_options(opts):
+        raise RuntimeError("saving the options failed")
+    zone.apply_settings(cleaned)
+    return cleaned
+
+
+def create_app(zones: list[Zone], token: str = "") -> web.Application:
     # As files, so FileResponse can answer Range requests (Safari needs them
     # to play audio in the page).
     track_dir = Path(tempfile.mkdtemp(prefix="ap2-tracks-"))
@@ -230,6 +349,11 @@ def create_app(zones: list[Zone]) -> web.Application:
 
     @web.middleware
     async def only_ingress(request: web.Request, handler):
+        if request.path.startswith(INT_PREFIX):
+            given = request.headers.get("Authorization", "").removeprefix("Bearer ")
+            if not token or not secrets.compare_digest(given, token):
+                raise web.HTTPUnauthorized()
+            return await handler(request)
         if request.remote not in ALLOWED_PEERS:
             raise web.HTTPForbidden(text="only via Home Assistant ingress")
         return await handler(request)
@@ -253,41 +377,7 @@ def create_app(zones: list[Zone]) -> web.Application:
         return web.FileResponse(level_file, headers={"Content-Type": "audio/wav"})
 
     async def list_zones(_request: web.Request) -> web.Response:
-        def track(z):
-            t = z.track
-            if t is None:
-                return None
-            return {"title": t.title, "artist": t.artist, "album": t.album}
-
-        return web.json_response(
-            [
-                {
-                    "index": z.cfg.index,
-                    "name": z.cfg.name,
-                    "speakers": [
-                        {
-                            "label": link.cfg.label,
-                            "host": link.cfg.host,
-                            "channel": link.cfg.channel,
-                            "paired": link.client_id is not None,
-                        }
-                        for link in z.links
-                    ],
-                    "track": track(z),
-                    "cover": cover_key(z.track.cover if z.track else None),
-                    "offset_ms": z.cfg.latency_offset_ms,
-                    "lead_ms": z.lead_ms(),
-                    "trim_db": z.cfg.volume_trim_db,
-                    "speaker_volume": z.echo_volume,
-                    "speaker_volume_target": z.target_volume(),
-                    "night_active": z.night_active(),
-                    "model": z.model,
-                    "stats": z.stats,
-                    "playing": z.streaming,
-                }
-                for z in zones
-            ]
-        )
+        return web.json_response([zone_state(z) for z in zones])
 
     async def set_mute(request: web.Request) -> web.Response:
         zone = zone_or_404(request)
@@ -375,6 +465,60 @@ def create_app(zones: list[Zone]) -> web.Application:
         found = speakers.parse_discovery(rendered, read_options().get("zones", []))
         return web.json_response(found)
 
+    # ---- API of the Home Assistant integration (token, see middleware) ----
+    sockets: set[web.WebSocketResponse] = set()
+    pending = {"handle": None}
+
+    def state_message() -> str:
+        return json.dumps({"type": "state", "zones": [zone_state(z) for z in zones]})
+
+    def broadcast() -> None:
+        pending["handle"] = None
+        msg = state_message()
+        for ws in list(sockets):
+            if ws.closed:
+                sockets.discard(ws)
+            else:
+                asyncio.ensure_future(ws.send_str(msg))
+
+    def on_change(_zone) -> None:
+        if pending["handle"] is None and sockets:  # collect changes for 0.2 s
+            pending["handle"] = asyncio.get_running_loop().call_later(0.2, broadcast)
+
+    for z in zones:
+        z.add_listener(on_change)
+
+    async def int_state(_request: web.Request) -> web.Response:
+        return web.json_response(
+            {
+                "version": os.environ.get("ADDON_VERSION", "dev"),
+                "zones": [zone_state(z) for z in zones],
+            }
+        )
+
+    async def int_ws(request: web.Request) -> web.WebSocketResponse:
+        ws = web.WebSocketResponse(heartbeat=30)
+        await ws.prepare(request)
+        sockets.add(ws)
+        try:
+            await ws.send_str(state_message())
+            async for _msg in ws:  # the integration only listens
+                pass
+        finally:
+            sockets.discard(ws)
+        return ws
+
+    async def int_set(request: web.Request) -> web.Response:
+        zone = zone_or_404(request)
+        body = await request.json()
+        try:
+            cleaned = await update_zone_settings(zone, body)
+        except ValueError as err:
+            raise web.HTTPBadRequest(text=str(err)) from None
+        except RuntimeError as err:
+            raise web.HTTPBadGateway(text=str(err)) from None
+        return web.json_response(speakers.public_zone(cleaned))
+
     app.router.add_get("/", index)
     app.router.add_get("/api/config", get_config)
     app.router.add_put("/api/config", put_config)
@@ -395,13 +539,20 @@ def create_app(zones: list[Zone]) -> web.Application:
     app.router.add_post("/api/zones/{index}/offset", set_offset)
     app.router.add_post("/api/zones/{index}/level", set_level)
     app.router.add_post("/api/zones/{index}/trim", set_trim)
+    app.router.add_get("/int/state", int_state)
+    app.router.add_get("/int/ws", int_ws)
+    app.router.add_post("/int/zones/{index}/set", int_set)
+    app.router.add_post("/int/zones/{index}/test", test_tone)
+    app.router.add_get("/int/zones/{index}/cover", cover)
     return app
 
 
 async def start_web(zones: list[Zone]) -> web.AppRunner:
-    runner = web.AppRunner(create_app(zones), access_log=None)
+    token = load_token()
+    runner = web.AppRunner(create_app(zones, token), access_log=None)
     await runner.setup()
     site = web.TCPSite(runner, host="0.0.0.0", port=INGRESS_PORT)  # noqa: S104
     await site.start()
     log.info("Calibration page running (ingress, port %s)", INGRESS_PORT)
+    asyncio.ensure_future(announce_to_ha(token))
     return runner

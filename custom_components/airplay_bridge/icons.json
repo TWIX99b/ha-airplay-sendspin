@@ -1,0 +1,49 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "airplay": {
+        "default": "mdi:cast-audio-variant",
+        "state": {
+          "off": "mdi:cast-off"
+        }
+      }
+    },
+    "sensor": {
+      "track": {
+        "default": "mdi:music"
+      },
+      "dropouts": {
+        "default": "mdi:wifi-alert"
+      }
+    },
+    "number": {
+      "offset": {
+        "default": "mdi:timer-sync-outline"
+      },
+      "trim": {
+        "default": "mdi:volume-equal"
+      },
+      "airplay_volume": {
+        "default": "mdi:volume-high"
+      }
+    },
+    "switch": {
+      "night_mode": {
+        "default": "mdi:weather-night",
+        "state": {
+          "off": "mdi:weather-sunny"
+        }
+      }
+    },
+    "button": {
+      "test_tone": {
+        "default": "mdi:bell-ring-outline"
+      }
+    },
+    "image": {
+      "cover": {
+        "default": "mdi:album"
+      }
+    }
+  }
+}

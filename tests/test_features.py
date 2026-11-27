@@ -3,7 +3,7 @@
 * stereo pair: both speakers get the same play time, left/right separated
 * track info: shairport-sync metadata stream → TrackInfo → Sendspin roles
 * voice assistant: volume back down while active, up again after idle
-* MQTT: discovery payloads and number commands
+* state for the Home Assistant integration (web.zone_state)
 
     python3 tests/test_features.py
 """
@@ -65,7 +65,6 @@ sys.modules["aiosendspin.server"].SendspinServer = _Any
 
 import bridge  # noqa: E402
 import metadata  # noqa: E402
-import mqtt_ha  # noqa: E402
 import speakers  # noqa: E402
 
 FAILS = []
@@ -300,52 +299,41 @@ def test_metadata():
     check(p.feed(meta_item("ssnc", "pend")) == [None], "metadata: end → None")
 
 
-def test_mqtt():
-    cfg = bridge.zone_config(0, {"name": "Stube Echo", "host": "A", "port": 1})
+def test_zone_state():
+    import web
+
+    cfg = bridge.zone_config(
+        0,
+        {
+            "name": "Stube Echo",
+            "host": "A",
+            "port": 1,
+            "token_entity": "sensor.t",
+            "night_volume": 40,
+            "night_enabled": False,
+        },
+    )
     zone = bridge.Zone(cfg, FakeSide({"A": 1}), OPTS)
-    msgs = mqtt_ha.discovery_messages(zone, "0.5.0", "de")
-    topics = [t for t, _ in msgs]
-    check(len(msgs) == 5, "mqtt: 5 entities")
+    zone.stats.update(resyncs=2, drops=1, lost=1)
+    st = web.zone_state(zone)
+    check(st["key"] == "stube_echo", "state: key for entity ids")
+    check(st["dropouts"] == 4, "state: dropouts")
     check(
-        "homeassistant/number/ap2s_stube_echo/offset/config" in topics,
-        "mqtt: number topic",
+        st["night_enabled"] is False and not zone.night_active(23 * 60),
+        "state: night mode switched off",
     )
-    check(
-        all(p["unique_id"].startswith("ap2s_stube_echo_") for _, p in msgs),
-        "mqtt: unique ids",
+    check(st["speakers"][0]["token_entity"] == "sensor.t", "state: token entity")
+    z = speakers.clean_zone(
+        {
+            "name": "X",
+            "host": "h",
+            "token_entity": "s",
+            "night_volume": 30,
+            "night_enabled": False,
+        },
+        None,
     )
-    check(msgs[2][1]["name"] == "Feinabgleich", "mqtt: German names")
-    saved = []
-
-    async def save(index, key, value):
-        saved.append((index, key, value))
-        return True
-
-    async def run():
-        m = mqtt_ha.MqttBridge([zone], save, "0.5.0", "de")
-        m.handle("airplay_sendspin/stube_echo/offset/set", "-230")
-        m.handle("airplay_sendspin/stube_echo/trim/set", "-3.5")
-        m.handle("airplay_sendspin/stube_echo/trim/set", "12")  # clamped
-        await asyncio.sleep(0.01)
-
-    asyncio.run(run())
-    check(zone.cfg.latency_offset_ms == -230, "mqtt: offset set live")
-    check(zone.cfg.volume_trim_db == 0.0, "mqtt: trim clamped to 0")
-    check(
-        (0, "latency_offset_ms", -230) in saved
-        and (0, "volume_trim_db", -3.5) in saved,
-        "mqtt: values saved",
-    )
-    ext = mqtt_ha.broker_from_options(
-        {"mqtt_host": " 10.0.0.9 ", "mqtt_port": 1884, "mqtt_username": "u"}
-    )
-    check(
-        ext["host"] == "10.0.0.9" and ext["port"] == 1884 and ext["username"] == "u",
-        "mqtt: external broker from options",
-    )
-    check(mqtt_ha.broker_from_options({"mqtt_host": ""}) is None, "mqtt: empty host")
-    states = dict(mqtt_ha.state_messages(zone))
-    check(states["airplay_sendspin/stube_echo/offset"] == "-230", "mqtt: state topic")
+    check(z["night_enabled"] is False, "speakers: night_enabled kept")
 
 
 def test_speakers():
@@ -553,7 +541,6 @@ async def test_stats():
     await zone._session(queue, (now, stereo_chunk(1, 1)))
     check(zone.stats["sessions"] == 1, "stats: one session")
     check(zone.stats["resyncs"] >= 1, "stats: hiccup counted")
-    check(mqtt_ha.dropouts(zone.stats) >= 1, "stats: dropouts for MQTT")
     check(zone.stats["audio_s"] > 0.1, "stats: audio time")
 
 
@@ -567,6 +554,6 @@ test_pick_channel()
 asyncio.run(test_pair_session())
 asyncio.run(test_voice())
 test_metadata()
-test_mqtt()
+test_zone_state()
 print("ALL OK" if not FAILS else f"{len(FAILS)} FAILED")
 sys.exit(1 if FAILS else 0)
