@@ -34,9 +34,12 @@ RUN git clone https://github.com/mikebrady/nqptp.git /tmp/nqptp \
  && make install \
  && rm -rf /tmp/nqptp
 
-# shairport-sync with AirPlay 2 and stdout output
+# shairport-sync with AirPlay 2 and stdout output; patched so each instance
+# can report the real model and manufacturer (icon in the iOS AirPlay menu)
+COPY patches /tmp/patches
 RUN git clone --depth 1 --branch "${SPS_VERSION}" \
       https://github.com/mikebrady/shairport-sync.git /tmp/sps \
+ && python3 /tmp/patches/sps_identity.py /tmp/sps \
  && cd /tmp/sps \
  && autoreconf -fi \
  && ./configure --prefix=/usr --sysconfdir=/etc \

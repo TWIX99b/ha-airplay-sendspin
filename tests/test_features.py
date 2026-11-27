@@ -305,7 +305,7 @@ def test_mqtt():
     zone = bridge.Zone(cfg, FakeSide({"A": 1}), OPTS)
     msgs = mqtt_ha.discovery_messages(zone, "0.5.0", "de")
     topics = [t for t, _ in msgs]
-    check(len(msgs) == 4, "mqtt: 4 entities")
+    check(len(msgs) == 5, "mqtt: 5 entities")
     check(
         "homeassistant/number/ap2s_stube_echo/offset/config" in topics,
         "mqtt: number topic",
@@ -428,8 +428,141 @@ def test_speakers():
     check(speakers.parse_discovery("garbage", []) == [], "discovery: bad input")
 
 
+def test_night_and_volume():
+    cfg = bridge.zone_config(
+        0,
+        {
+            "name": "Schlafzimmer",
+            "host": "A",
+            "port": 1,
+            "speaker_volume": 70,
+            "night_volume": 40,
+            "night_start": "22:00",
+            "night_end": "07:00",
+        },
+    )
+    zone = bridge.Zone(cfg, FakeSide({"A": 30}), OPTS)
+    check(zone.target_volume(12 * 60) == 70, "volume: per speaker by day")
+    check(zone.target_volume(23 * 60) == 40, "volume: night mode at 23:00")
+    check(zone.target_volume(6 * 60 + 59) == 40, "volume: night mode until 07:00")
+    check(zone.target_volume(7 * 60) == 70, "volume: day again at 07:00")
+    plain = bridge.Zone(
+        bridge.zone_config(1, {"name": "Bad", "host": "B", "port": 1}),
+        FakeSide({"B": 1}),
+        {**OPTS, "speaker_volume": 90},
+    )
+    check(plain.target_volume(23 * 60) == 90, "volume: global default, no night mode")
+    try:
+        speakers.clean_zone(
+            {
+                "name": "X",
+                "host": "h",
+                "token_entity": "s",
+                "night_volume": 30,
+                "night_start": "25:00",
+            },
+            None,
+        )
+        check(False, "speakers: rejects bad night time")
+    except ValueError:
+        check(True, "speakers: rejects bad night time")
+    z = speakers.clean_zone(
+        {"name": "X", "host": "h", "token_entity": "s", "night_volume": 30}, None
+    )
+    check(z["night_start"] == "22:00" and z["night_end"] == "07:00", "night: defaults")
+    check(not speakers.needs_restart([{**z, "night_volume": 50}], [z]), "night: live")
+
+
+async def test_follow_night():
+    cfg = bridge.zone_config(
+        0,
+        {
+            "name": "S",
+            "host": "A",
+            "port": 1,
+            "night_volume": 40,
+            "night_start": "00:00",
+            "night_end": "00:00",
+        },
+    )  # start == end: off
+    side = FakeSide({"A": 30})
+    zone = bridge.Zone(cfg, side, OPTS)
+    link = zone.links[0]
+    link.client_id = "x"
+    await zone._acquire(link)
+    zone._take_volume(link)
+    zone.active, zone.streaming = [link], True
+    check(side.players["A"].volume == 100, "night: off → 100")
+    zone.apply_settings(
+        {
+            "latency_offset_ms": 0,
+            "volume_trim_db": 0.0,
+            "night_volume": 40,
+            "night_start": "00:00",
+            "night_end": "23:59",
+        }
+    )
+    check(side.players["A"].volume == 40, "night: switched on live → 40")
+    await zone._give_volume_back(link)
+    check(side.players["A"].volume == 30, "night: old volume back after session")
+
+
+async def test_tone_pair():
+    cfg = bridge.zone_config(
+        0, {"name": "Paar", "host": "A", "port": 1, "partner_host": "B"}
+    )
+    side = FakeSide({"A": 40, "B": 40})
+    zone = bridge.Zone(cfg, side, OPTS)
+    for link in zone.links:
+        link.client_id = "id"
+    bridge.TONE_LEAD_US = 1000
+    ok = await zone.test_tone()
+    check(ok, "test tone: played")
+    a, b = side.groups["A"].stream.commits, side.groups["B"].stream.commits
+
+    def first_sound(commits):
+        for t, pcm in commits:
+            arr = array("h")
+            arr.frombytes(pcm)
+            if max(map(abs, arr)) > 1000:
+                return t
+        return None
+
+    ta, tb = first_sound(a), first_sound(b)
+    check(
+        ta is not None and tb is not None and tb > ta,
+        "test tone: left first, then right",
+    )
+    check(abs((tb - ta) - bridge.TONE_GAP_S * 1e6) < 30_000, "test tone: 0.9 s apart")
+    check(side.players["A"].history == [], "test tone: volume untouched")
+    zone.streaming = True
+    check(not await zone.test_tone(), "test tone: refused while AirPlay plays")
+
+
+async def test_stats():
+    cfg = bridge.zone_config(0, {"name": "W", "host": "A", "port": 1})
+    side = FakeSide({"A": 50})
+    zone = bridge.Zone(cfg, side, OPTS)
+    zone.links[0].client_id = "x"
+    queue = asyncio.Queue()
+    now = bridge.mono_us()
+    for _ in range(4):  # first batch: first + 4 = MAX_BATCH chunks
+        queue.put_nowait((now, stereo_chunk(1, 1)))
+    # a big jump in arrival time = an audible hiccup (resync)
+    queue.put_nowait((now + 2_000_000, stereo_chunk(1, 1)))
+    await zone._session(queue, (now, stereo_chunk(1, 1)))
+    check(zone.stats["sessions"] == 1, "stats: one session")
+    check(zone.stats["resyncs"] >= 1, "stats: hiccup counted")
+    check(mqtt_ha.dropouts(zone.stats) >= 1, "stats: dropouts for MQTT")
+    check(zone.stats["audio_s"] > 0.1, "stats: audio time")
+
+
 test_config()
 test_speakers()
+test_night_and_volume()
+asyncio.run(test_follow_night())
+asyncio.run(test_tone_pair())
+asyncio.run(test_stats())
 test_pick_channel()
 asyncio.run(test_pair_session())
 asyncio.run(test_voice())

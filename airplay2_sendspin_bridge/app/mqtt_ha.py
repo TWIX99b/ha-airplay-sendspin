@@ -33,12 +33,14 @@ NAMES = {
         "track": "Titel",
         "offset": "Feinabgleich",
         "trim": "Lautstärke-Anpassung",
+        "dropouts": "Aussetzer",
     },
     "en": {
         "playing": "AirPlay",
         "track": "Now playing",
         "offset": "Sync offset",
         "trim": "Volume trim",
+        "dropouts": "Dropouts",
     },
 }
 
@@ -155,6 +157,18 @@ def discovery_messages(zone, version: str, lang: str) -> list[tuple[str, dict]]:
                 "icon": "mdi:volume-equal",
             },
         ),
+        (
+            f"{DISCOVERY}/sensor/ap2s_{key}/dropouts/config",
+            {
+                **common,
+                "name": names["dropouts"],
+                "unique_id": f"ap2s_{key}_dropouts",
+                "state_topic": f"{base}/dropouts",
+                "state_class": "total_increasing",
+                "entity_category": "diagnostic",
+                "icon": "mdi:wifi-alert",
+            },
+        ),
     ]
 
 
@@ -171,7 +185,13 @@ def state_messages(zone) -> list[tuple[str, str]]:
         (f"{base}/track", json.dumps(info, ensure_ascii=False)),
         (f"{base}/offset", str(zone.cfg.latency_offset_ms)),
         (f"{base}/trim", f"{zone.cfg.volume_trim_db:.1f}"),
+        (f"{base}/dropouts", str(dropouts(zone.stats))),
     ]
+
+
+def dropouts(stats: dict) -> int:
+    """Audible hiccups since the add-on started (resync, gap, lost speaker)."""
+    return int(stats.get("resyncs", 0) + stats.get("drops", 0) + stats.get("lost", 0))
 
 
 class MqttBridge:

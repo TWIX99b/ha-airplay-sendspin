@@ -1,5 +1,5 @@
 name: AirPlay 2 → Sendspin Bridge
-version: "0.6.0"
+version: "0.7.0"
 slug: airplay2_sendspin_bridge
 description: >-
   Turns Sendspin speakers (e.g. Echos with echo-dot-assist) into real AirPlay 2
@@ -36,6 +36,7 @@ options:
   ignore_airplay_volume: false
   speaker_volume: 100
   lower_volume_during_voice: true
+  report_model: true
   metadata: true
   mqtt: true
   mqtt_host: ""
@@ -56,6 +57,7 @@ schema:
   ignore_airplay_volume: bool
   speaker_volume: int(0,100)
   lower_volume_during_voice: bool
+  report_model: bool
   metadata: bool
   mqtt: bool
   mqtt_host: str?
@@ -80,3 +82,7 @@ schema:
       partner_pairing_token: password?
       partner_token_entity: str?
       partner_satellite_entity: str?
+      speaker_volume: int(0,100)?
+      night_volume: int(0,100)?
+      night_start: str?
+      night_end: str?

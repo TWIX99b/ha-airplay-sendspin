@@ -75,9 +75,14 @@
   .stats { display:flex; gap:8px; flex-wrap:wrap; }
   .stat { background:var(--soft); border-radius:10px; padding:5px 10px; font-size:.82rem; }
   .stat b { font-size:.95rem; }
+  .stat.night { background:#312e81; color:#e0e7ff; }
+  .q-good { color:var(--ok); } .q-ok { color:var(--warn); } .q-bad { color:var(--bad); }
+  .quality { font-size:.82rem; color:var(--muted); }
+  .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
   .badge { font-size:.75rem; font-weight:700; color:var(--acc); background:var(--soft); border-radius:6px; padding:1px 7px; }
   .tile .actions { margin-top:auto; display:flex; gap:6px; }
-  .tile .actions button { margin:0; flex:1; padding:8px 10px; }
+  .tile .actions button { margin:0; flex:1; padding:8px 10px; white-space:nowrap; }
+  .tile .actions button.icon { flex:none; width:44px; padding:8px 0; font-size:1.05rem; }
   .addtile { border:2px dashed var(--bd); background:transparent; box-shadow:none; color:var(--muted); align-items:center; justify-content:center; cursor:pointer; font-weight:650; }
   .addtile:hover { border-color:var(--acc); color:var(--acc); }
   .addtile .plus { font-size:34px; line-height:1; }
@@ -280,6 +285,18 @@
     </div>
     <div class="hint" id="knownHint"></div>
 
+    <label class="f" for="fVol" data-t="fVol"></label>
+    <input id="fVol" type="number" min="1" max="100" step="1">
+    <div class="hint" data-t="fVolHint"></div>
+
+    <label class="f" data-t="fNight"></label>
+    <div class="three">
+      <div><input id="fNightVol" type="number" min="0" max="100" step="1" placeholder="%"></div>
+      <div><input id="fNightStart" type="time"></div>
+      <div><input id="fNightEnd" type="time"></div>
+    </div>
+    <div class="hint" data-t="fNightHint"></div>
+
     <details>
       <summary data-t="advanced"></summary>
       <div class="two">
@@ -313,6 +330,13 @@
 <script>
 const DE = navigator.language.toLowerCase().startsWith('de');
 const T = DE ? {
+  testTone: 'Test-Ton', testBusy: 'Gerade nicht möglich – spielt AirPlay oder ist der Echo nicht gekoppelt?',
+  testDone: 'Test-Ton gespielt', testPair: 'Test-Ton: erst links, dann rechts',
+  qGood: 'gut', qOk: 'mäßig', qBad: 'schlecht', qNone: 'noch keine Daten',
+  quality: (q, n, h) => `Verbindung: ${q}` + (h === null ? '' : ` · ${n} Aussetzer in ${h}`),
+  night: 'Nacht', nightOn: 'Nachtmodus aktiv',
+  fVol: 'AirPlay-Lautstärke (%)', fVolHint: 'So laut stellt das Add-on den Echo, solange AirPlay spielt. Leer = Standard aus den Optionen (100 %).',
+  fNight: 'Nachtmodus: höchstens % · von · bis', fNightHint: 'Leer = aus. Beispiel: 40 %, 22:00 bis 07:00 – wirkt sofort, auch während der Wiedergabe.',
   appTitle: 'AirPlay Bridge',
   appSub: 'Echos als AirPlay-2-Lautsprecher – verwalten und einmessen',
   tabSpk: 'Lautsprecher', tabCal: 'Einmessen',
@@ -405,6 +429,13 @@ const T = DE ? {
   lvManual: 'Lautstärke von Hand',
   lvManualHint: 'Wirkt sofort. 0 dB = unverändert, weniger = Lautsprecher leiser. Lauter als 0 dB geht nicht.',
 } : {
+  testTone: 'Test tone', testBusy: 'Not possible right now – is AirPlay playing or the Echo not paired?',
+  testDone: 'Test tone played', testPair: 'Test tone: left first, then right',
+  qGood: 'good', qOk: 'fair', qBad: 'poor', qNone: 'no data yet',
+  quality: (q, n, h) => `Connection: ${q}` + (h === null ? '' : ` · ${n} dropouts in ${h}`),
+  night: 'Night', nightOn: 'night mode active',
+  fVol: 'AirPlay volume (%)', fVolHint: 'The add-on sets the Echo to this volume while AirPlay plays. Empty = default from the options (100 %).',
+  fNight: 'Night mode: at most % · from · to', fNightHint: 'Empty = off. Example: 40 %, 22:00 to 07:00 – takes effect at once, also while playing.',
   appTitle: 'AirPlay Bridge',
   appSub: 'Echos as AirPlay 2 speakers – manage and calibrate',
   tabSpk: 'Speakers', tabCal: 'Calibrate',
@@ -619,13 +650,28 @@ function renderTiles() {
     const pair = c.partner_host
       ? `<span class="badge">${T.stereo}</span> <span class="meta">${T.left}: ${esc(dev?.area || c.host)} · ${T.right}: ${esc(pdev?.area || c.partner_host)}</span>` : '';
     const vol = z && z.playing && z.speaker_volume !== null ? `<div class="stat">${T.speakerVol} <b>${z.speaker_volume} %</b></div>` : '';
+    const night = c.night_volume !== undefined && c.night_volume !== null
+      ? `<div class="stat${z && z.night_active ? ' night' : ''}" title="${z && z.night_active ? T.nightOn : ''}">🌙 ${T.night} <b>${c.night_volume} %</b> ${esc(c.night_start || '22:00')}–${esc(c.night_end || '07:00')}</div>` : '';
+    let quality = '';
+    if (z && z.stats) {
+      const st = z.stats, n = st.resyncs + st.drops + st.lost, hours = st.audio_s / 3600;
+      if (st.audio_s < 60) quality = `<div class="quality">${T.quality(T.qNone, 0, null)}</div>`;
+      else {
+        const rate = n / Math.max(hours, 0.1);
+        const [cls, word] = n === 0 || rate < 1 ? ['q-good', T.qGood] : rate < 4 ? ['q-ok', T.qOk] : ['q-bad', T.qBad];
+        const dur = hours >= 1 ? `${hours.toFixed(1).replace('.', DE ? ',' : '.')} h` : `${Math.round(st.audio_s / 60)} min`;
+        quality = `<div class="quality"><span class="${cls}">●</span> ${T.quality(word, n, dur)}</div>`;
+      }
+    }
     return `<div class="tile${z && z.playing ? ' playing' : ''}">
       <div class="top"><div><div class="name">${esc(c.name)}</div><div class="meta">${esc(meta)}</div></div>${pill}</div>
       ${pair ? `<div>${pair}</div>` : ''}
       ${now}
       <div class="stats"><div class="stat">${T.offset} <b>${sgn(c.latency_offset_ms || 0)} ms</b></div>
-        <div class="stat">${T.volume} <b>${fmtDb(c.volume_trim_db || 0)}</b></div>${vol}</div>
+        <div class="stat">${T.volume} <b>${fmtDb(c.volume_trim_db || 0)}</b></div>${vol}${night}</div>
+      ${quality}
       <div class="actions"><button class="ghost" data-edit="${i}">${T.edit}</button>
+        <button class="ghost icon" data-test="${i}" title="${T.testTone}" aria-label="${T.testTone}" ${z && !z.playing ? '' : 'disabled'}>♪</button>
         <button class="sec" data-cal="${i}" ${z ? '' : 'disabled'}>${T.calibrate}</button></div>
     </div>`;
   });
@@ -636,6 +682,14 @@ function renderTiles() {
     $('zone').value = b.dataset.cal; refresh(); showTab('cal'); window.scrollTo(0, 0);
   });
   $('addTile').onclick = openAdd;
+  document.querySelectorAll('[data-test]').forEach(b => b.onclick = async () => {
+    const i = Number(b.dataset.test); b.disabled = true;
+    try {
+      const r = await fetch(`api/zones/${i}/test`, { method: 'POST' });
+      toast(r.ok ? (cfg[i].partner_host ? T.testPair : T.testDone) : T.testBusy);
+    } catch (e) { toast(T.testBusy); }
+    finally { b.disabled = false; }
+  });
 }
 
 async function openAdd() {
@@ -693,6 +747,10 @@ async function openEdit(idx, sugg) {
   $('fToken').value = c.token_entity || '';
   $('fOffset').value = c.latency_offset_ms ?? 0;
   $('fTrim').value = c.volume_trim_db ?? 0;
+  $('fVol').value = c.speaker_volume ?? '';
+  $('fNightVol').value = c.night_volume ?? '';
+  $('fNightStart').value = c.night_start || '22:00';
+  $('fNightEnd').value = c.night_end || '07:00';
   $('fPort').value = c.port || 28928;
   $('fPath').value = c.path || '/sendspin';
   $('fPairing').value = '';
@@ -729,6 +787,12 @@ function formZone() {
     volume_trim_db: Math.round((Number($('fTrim').value) || 0) * 10) / 10,
   };
   if ($('fPairing').value.trim()) z.pairing_token = $('fPairing').value.trim();
+  if ($('fVol').value !== '') z.speaker_volume = Math.round(Number($('fVol').value));
+  if ($('fNightVol').value !== '') {
+    z.night_volume = Math.round(Number($('fNightVol').value));
+    z.night_start = $('fNightStart').value || '22:00';
+    z.night_end = $('fNightEnd').value || '07:00';
+  }
   const ph = ($('fPartner').value || $('fPHost').value).trim();
   if (ph) {
     z.partner_host = ph; z.partner_token_entity = $('fPToken').value.trim();

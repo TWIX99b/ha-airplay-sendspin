@@ -116,6 +116,9 @@ zones:
 | `mqtt_host`, `mqtt_port`, `mqtt_username`, `mqtt_password`, `mqtt_tls` | Eigener (externer) Broker, z. B. Mosquitto im LXC. `mqtt_host` leer = Broker aus HA (Mosquitto-Add-on). |
 | `zones[].satellite_entity` | Sprachassistent des Lautsprechers (`assist_satellite.*`). Leer = automatisch über `token_entity`. |
 | `zones[].partner_host` usw. | Zweiter Lautsprecher als Stereo-Paar, siehe unten. |
+| `report_model` | Meldet AirPlay das echte Modell und den Hersteller (z. B. „Echo 2“ von Amazon) statt „ShairportSync“ (Standard an). |
+| `zones[].speaker_volume` | AirPlay-Lautstärke dieses Lautsprechers in %, überschreibt `speaker_volume`. |
+| `zones[].night_volume`, `night_start`, `night_end` | Nachtmodus: zwischen Start und Ende höchstens so viel % (z. B. 40, 22:00, 07:00). |
 
 ### Automatisch einmessen
 
@@ -211,6 +214,32 @@ erscheint pro Lautsprecher ein Gerät „<Name> AirPlay“ mit:
 - **Titel**: aktueller Titel, Interpret und Album als Attribute
 - **Feinabgleich** und **Lautstärke-Anpassung**: änderbar, wirken sofort
   und werden gespeichert
+
+### Symbol, Test-Ton, Verbindung, Nachtmodus
+
+**Symbol im AirPlay-Menü:** iOS wählt das Symbol nach dem gemeldeten Modell
+und Hersteller. shairport-sync meldet von Haus aus immer „ShairportSync“; das
+Add-on baut es so, dass jeder Lautsprecher sein echtes Modell meldet, das es
+aus HA liest (z. B. „Echo 2“ von Amazon) – so wie eine Sonos „One“ von
+„Sonos“ meldet. Welches Symbol iOS dann zeigt, entscheidet iOS. Ein
+Apple-Modell wird bewusst nicht vorgetäuscht. Zusätzlich lassen sich die
+Lautsprecher in die Apple-Home-App aufnehmen (Home → + → Gerät hinzufügen →
+Weitere Optionen) und einem Raum zuordnen.
+
+**Test-Ton:** Der ♪-Knopf auf der Kachel spielt direkt über das Add-on einen
+kurzen Ton auf dem Echo, ohne iPhone und AirPlay – zum Prüfen von Kopplung und
+IP. Ein Stereo-Paar spielt ihn erst links, dann rechts. Die Lautstärke des
+Echos bleibt dabei unverändert.
+
+**Verbindung:** Die Kachel zeigt, wie oft es seit dem Start des Add-ons
+gehakt hat (Nachsynchronisierung, Lücke, verlorener Lautsprecher) und wie
+viel Musik lief: gut unter 1 Aussetzer pro Stunde, mäßig unter 4, sonst
+schlecht. Als MQTT-Sensor „Aussetzer“ auch in HA.
+
+**Lautstärke pro Lautsprecher und Nachtmodus:** Im Bearbeiten-Dialog eigene
+AirPlay-Lautstärke pro Echo und ein Nachtmodus, z. B. höchstens 40 % von
+22:00 bis 07:00. Beginnt die Nacht während der Wiedergabe, wird der Echo
+leiser, außer er wurde am Gerät selbst verstellt. Es gilt die Zeitzone von HA.
 
 ### Messwerte (Info)
 
@@ -327,6 +356,9 @@ edited there by hand.
 | `mqtt_host`, `mqtt_port`, `mqtt_username`, `mqtt_password`, `mqtt_tls` | Your own (external) broker, e.g. Mosquitto in an LXC. Empty `mqtt_host` = broker from HA (Mosquitto add-on). |
 | `zones[].satellite_entity` | The speaker's voice assistant (`assist_satellite.*`). Empty = found via `token_entity`. |
 | `zones[].partner_host` etc. | Second speaker as a stereo pair, see below. |
+| `report_model` | Tells AirPlay the real model and manufacturer (e.g. "Echo 2" by Amazon) instead of "ShairportSync" (default on). |
+| `zones[].speaker_volume` | AirPlay volume of this speaker in %, overrides `speaker_volume`. |
+| `zones[].night_volume`, `night_start`, `night_end` | Night mode: at most this % between start and end (e.g. 40, 22:00, 07:00). |
 
 ### Automatic calibration
 
@@ -418,6 +450,30 @@ gets a device "<name> AirPlay" with:
 - **Now playing**: current title, artist and album as attributes
 - **Sync offset** and **Volume trim**: editable, take effect immediately and
   are saved
+
+### Icon, test tone, connection, night mode
+
+**Icon in the AirPlay menu:** iOS picks the icon from the reported model and
+manufacturer. shairport-sync always reports "ShairportSync"; the add-on builds
+it so that each speaker reports its real model, read from HA (e.g. "Echo 2" by
+Amazon) – just as a Sonos reports "One" by "Sonos". Which icon iOS then shows
+is up to iOS. An Apple model is deliberately not faked. The speakers can also
+be added to the Apple Home app (Home → + → Add Accessory → More options) and
+assigned to a room.
+
+**Test tone:** The ♪ button on the tile plays a short tone on the Echo
+straight from the add-on, without iPhone or AirPlay – to check pairing and IP.
+A stereo pair plays it left first, then right. The Echo's volume stays as is.
+
+**Connection:** The tile shows how often it hiccupped since the add-on
+started (resync, gap, lost speaker) and how much music played: good below 1
+dropout per hour, fair below 4, otherwise poor. Also as MQTT sensor
+"Dropouts" in HA.
+
+**Per-speaker volume and night mode:** In the edit dialog, an AirPlay volume
+per Echo and a night mode, e.g. at most 40 % from 22:00 to 07:00. If night
+starts during playback the Echo gets quieter, unless it was changed on the
+device itself. HA's time zone applies.
 
 ### Measured values (info)
 

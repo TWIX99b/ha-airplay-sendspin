@@ -62,11 +62,25 @@ async def find_satellite(token_entity: str) -> str:
     return result or ""
 
 
-async def ha_language() -> str:
-    """HA's language ('de', 'en', …), for entity names."""
+async def find_device_info(token_entity: str) -> dict:
+    """Model and manufacturer of the device the token entity belongs to."""
+    entity = json.dumps(token_entity)
+    result = await render_template(
+        "{% set d = device_id(" + entity + ") %}"
+        "{{ {'model': device_attr(d, 'model') if d else none,"
+        " 'manufacturer': device_attr(d, 'manufacturer') if d else none} | to_json }}"
+    )
+    try:
+        return json.loads(result) if result else {}
+    except ValueError:
+        return {}
+
+
+async def ha_config() -> dict:
+    """HA's /api/config (time_zone, language, …); {} if not reachable."""
     headers = _headers()
     if headers is None:
-        return "en"
+        return {}
     try:
         async with (
             aiohttp.ClientSession() as session,
@@ -76,10 +90,9 @@ async def ha_language() -> str:
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as resp,
         ):
-            data = await resp.json()
-            return str(data.get("language") or "en").split("-")[0]
+            return await resp.json()
     except (TimeoutError, aiohttp.ClientError, ValueError):
-        return "en"
+        return {}
 
 
 class SatelliteWatcher:

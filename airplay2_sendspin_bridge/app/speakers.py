@@ -131,6 +131,22 @@ def clean_zone(raw: dict, old: dict | None) -> dict:
         raise ValueError(f"{name}: volume trim must be within −30 … 0 dB")
     zone["volume_trim_db"] = trim
 
+    # Per-speaker AirPlay volume and night mode (live, no restart)
+    for key in ("speaker_volume", "night_volume"):
+        value = raw.get(key)
+        if value in (None, ""):
+            continue
+        value = int(value)
+        if not 0 <= value <= 100:
+            raise ValueError(f"{name}: {key} must be within 0 … 100 %")
+        zone[key] = value
+    if "night_volume" in zone:
+        for key, default in (("night_start", "22:00"), ("night_end", "07:00")):
+            value = _text(raw, key) or default
+            if not _hhmm(value):
+                raise ValueError(f"{name}: {key} must be HH:MM")
+            zone[key] = value
+
     partner = _text(raw, "partner_host")
     if partner:
         zone["partner_host"] = partner
@@ -147,6 +163,14 @@ def clean_zone(raw: dict, old: dict | None) -> dict:
         if "partner_pairing_token" not in zone and "partner_token_entity" not in zone:
             raise ValueError(f"{name}: token for the stereo partner missing")
     return zone
+
+
+def _hhmm(value: str) -> bool:
+    try:
+        h, m = (int(x) for x in value.split(":"))
+    except ValueError:
+        return False
+    return 0 <= h < 24 and 0 <= m < 60
 
 
 def clean_all(raw_zones: list, old_zones: list) -> list[dict]:

@@ -42,6 +42,12 @@ configuration:
       Solange der Sprachassistent des Lautsprechers zuhört oder antwortet,
       bekommt er seine alte Lautstärke zurück, damit die Antwort nicht mit
       AirPlay-Lautstärke kommt. Findet den Satelliten über token_entity.
+  report_model:
+    name: Echtes Modell melden
+    description: >-
+      Meldet AirPlay das echte Modell und den Hersteller (z. B. „Echo 2“ von
+      Amazon) statt „ShairportSync“. iOS wählt danach das Symbol im
+      AirPlay-Menü. Wirkt nach einem Neustart.
   metadata:
     name: Titel und Cover weitergeben
     description: >-

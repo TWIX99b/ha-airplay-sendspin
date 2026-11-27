@@ -24,6 +24,7 @@ import hashlib
 import io
 import json
 import logging
+import math
 import os
 import signal
 import time
@@ -42,9 +43,10 @@ from aiosendspin.noise import (
     decode_psk_token,
 )
 from aiosendspin.noise.pairing import PairingAttempt
-from ha import SatelliteWatcher, find_satellite, ha_language
+from ha import SatelliteWatcher, find_device_info, find_satellite, ha_config
 from metadata import MetadataReader, TrackInfo
 from mqtt_ha import MqttBridge, broker_from_options
+from speakers import model_name
 from web import save_zone_option, start_web
 
 try:  # the package may or may not re-export these
@@ -89,6 +91,10 @@ LEVEL_BUF_MAX = 150  # keep at most 3 s of noise
 # Voice assistant: back to the old volume while it listens/thinks/talks,
 # and only up again once it has been idle for a moment (follow-up questions).
 VOICE_IDLE_HOLD_S = 2.0
+# Test tone (web UI): a short two-tone chime straight to the speaker(s)
+TONE_GAP_S = 0.9  # stereo pair: left first, then right
+TONE_LEAD_US = 400_000
+MANUFACTURERS = {"echo": "Amazon"}  # model prefix → manufacturer if HA has none
 PCM_FORMAT = AudioFormat(sample_rate=SAMPLE_RATE, bit_depth=16, channels=CHANNELS)
 
 log = logging.getLogger("bridge")
@@ -120,6 +126,10 @@ class ZoneConfig:
     speakers: list[SpeakerConfig]
     latency_offset_ms: int
     volume_trim_db: float = 0.0
+    speaker_volume: int | None = None  # None = global option
+    night_volume: int | None = None  # None = no night mode
+    night_start: str = "22:00"
+    night_end: str = "07:00"
 
     @property
     def host(self) -> str:
@@ -213,6 +223,48 @@ def pick_channel(pcm: bytes, channel: int) -> bytes:
     out[0::2] = one
     out[1::2] = one
     return out.tobytes()
+
+
+def chime_pcm(offset_s: float = 0.0, total_s: float | None = None) -> bytes:
+    """Stereo S16 two-tone chime (880 → 1320 Hz) starting at offset_s."""
+    tone = []
+    for freq, dur in ((880.0, 0.16), (1320.0, 0.26)):
+        n = int(SAMPLE_RATE * dur)
+        for i in range(n):
+            env = min(1.0, i / 480, (n - i) / 2400)  # 10 ms in, 50 ms out
+            tone.append(
+                int(0.25 * 32767 * env * math.sin(2 * math.pi * freq * i / SAMPLE_RATE))
+            )
+    start = int(SAMPLE_RATE * offset_s)
+    total = int(SAMPLE_RATE * (total_s or offset_s + 0.6))
+    total += (-total) % CHUNK_FRAMES  # whole chunks
+    mono = array("h", bytes(2 * total))
+    part = array("h", tone)[: max(0, total - start)]
+    mono[start : start + len(part)] = part
+    out = array("h", bytes(4 * total))
+    out[0::2] = mono
+    out[1::2] = mono
+    return out.tobytes()
+
+
+def parse_hhmm(value: str, default: int) -> int:
+    """'22:30' → minutes after midnight."""
+    try:
+        h, m = (int(x) for x in str(value).split(":"))
+        if 0 <= h < 24 and 0 <= m < 60:
+            return h * 60 + m
+    except ValueError:
+        pass
+    return default
+
+
+def in_window(now_min: int, start_min: int, end_min: int) -> bool:
+    """True if now is within start…end (may wrap past midnight)."""
+    if start_min == end_min:
+        return False
+    if start_min < end_min:
+        return start_min <= now_min < end_min
+    return now_min >= start_min or now_min < end_min
 
 
 def cover_image(data: bytes | None):
@@ -400,6 +452,7 @@ class Link:
     player: object = None
     volume_before: int | None = None  # set when we turned it up for AirPlay
     lowered: bool = False  # back at volume_before for the voice assistant
+    volume_target: int = 0  # what we set for AirPlay (0 = untouched)
     restore_task: asyncio.Task | None = field(default=None, repr=False)
 
 
@@ -422,7 +475,19 @@ class Zone:
         self._lvl_buf: list[bytes] = []
         self._lvl_silent = 0
         # Speaker volume while AirPlay plays (0 = leave it alone)
-        self.speaker_volume = int(opts.get("speaker_volume", 100))
+        self.default_volume = int(opts.get("speaker_volume", 100))
+        self.report_model = bool(opts.get("report_model", True))
+        self.model = ""  # reported to AirPlay (icon), e.g. "Echo 2"
+        self.manufacturer = ""
+        self._session_lock = asyncio.Lock()
+        # Connection quality since the add-on started (tile, MQTT)
+        self.stats = {
+            "sessions": 0,
+            "audio_s": 0.0,
+            "resyncs": 0,
+            "drops": 0,
+            "lost": 0,
+        }
         self.lower_for_voice = bool(opts.get("lower_volume_during_voice", True))
         # Track info from shairport-sync
         self.use_metadata = bool(opts.get("metadata", True))
@@ -478,11 +543,53 @@ class Zone:
         return pcm
 
     # --- speaker volume ------------------------------------------------------
+    @property
+    def speaker_volume(self) -> int:
+        """Volume for AirPlay without night mode (per speaker, else global)."""
+        if self.cfg.speaker_volume is not None:
+            return int(self.cfg.speaker_volume)
+        return self.default_volume
+
+    def night_active(self, now_min: int | None = None) -> bool:
+        if self.cfg.night_volume is None:
+            return False
+        if now_min is None:
+            t = time.localtime()
+            now_min = t.tm_hour * 60 + t.tm_min
+        return in_window(
+            now_min,
+            parse_hhmm(self.cfg.night_start, 22 * 60),
+            parse_hhmm(self.cfg.night_end, 7 * 60),
+        )
+
+    def target_volume(self, now_min: int | None = None) -> int:
+        """Volume to set while AirPlay plays (0 = leave the speaker alone)."""
+        base = self.speaker_volume
+        if base <= 0:
+            return 0
+        if self.night_active(now_min):
+            return min(base, int(self.cfg.night_volume))
+        return base
+
+    def apply_settings(self, z: dict) -> None:
+        """Live change of offset / trim / volume settings from the web UI."""
+        if self.cfg.latency_offset_ms != z.get("latency_offset_ms", 0):
+            self.set_offset(int(z.get("latency_offset_ms", 0)))
+        if self.cfg.volume_trim_db != z.get("volume_trim_db", 0.0):
+            self.set_trim(float(z.get("volume_trim_db", 0.0)))
+        self.cfg.speaker_volume = z.get("speaker_volume")
+        self.cfg.night_volume = z.get("night_volume")
+        self.cfg.night_start = z.get("night_start") or "22:00"
+        self.cfg.night_end = z.get("night_end") or "07:00"
+        self._follow_target()
+        self._notify()
+
     def _take_volume(self, link: Link) -> None:
-        """Set the speaker to speaker_volume for AirPlay, remember the old value."""
+        """Set the speaker to its AirPlay volume, remember the old value."""
         link.volume_before = None
         link.lowered = False
-        target = self.speaker_volume
+        link.volume_target = 0
+        target = self.target_volume()
         player = link.player
         if target <= 0 or player is None:
             return
@@ -490,12 +597,41 @@ class Zone:
             self.log.warning("[%s] does not accept volume commands", link.cfg.label)
             return
         before = player.volume
+        link.volume_before = before
+        link.volume_target = target
         if before != target:
             player.set_volume(target)
-            link.volume_before = before
             self.log.info(
-                "[%s] volume %d → %d for AirPlay", link.cfg.label, before, target
+                "[%s] volume %d → %d for AirPlay%s",
+                link.cfg.label,
+                before,
+                target,
+                " (night mode)" if self.night_active() else "",
             )
+
+    def _follow_target(self) -> None:
+        """Night mode began/ended or settings changed while playing."""
+        if not self.streaming:
+            return
+        target = self.target_volume()
+        for link in self.active:
+            player = link.player
+            if player is None or link.volume_target <= 0 or link.lowered:
+                continue
+            if target == link.volume_target or target <= 0:
+                continue
+            if abs(player.volume - link.volume_target) > 1:
+                continue  # changed on the speaker: leave it
+            with contextlib.suppress(Exception):
+                player.set_volume(target)
+            self.log.info(
+                "[%s] volume %d → %d%s",
+                link.cfg.label,
+                link.volume_target,
+                target,
+                " (night mode)" if self.night_active() else "",
+            )
+            link.volume_target = target
 
     async def _give_volume_back(self, link: Link) -> None:
         """Restore the old speaker volume, unless someone changed it meanwhile."""
@@ -504,10 +640,11 @@ class Zone:
             link.restore_task = None
         before, link.volume_before = link.volume_before, None
         lowered, link.lowered = link.lowered, False
+        target, link.volume_target = link.volume_target, 0
         player = link.player
-        if before is None or player is None or lowered:
-            return  # nothing raised, or already back for the voice assistant
-        if abs(player.volume - self.speaker_volume) > 1:
+        if before is None or player is None or lowered or before == target:
+            return  # nothing changed, or already back for the voice assistant
+        if abs(player.volume - target) > 1:
             self.log.info(
                 "[%s] volume was changed during AirPlay (%d), keeping it",
                 link.cfg.label,
@@ -526,7 +663,7 @@ class Zone:
         for link in self.active:
             if link.cfg.satellite_entity != entity_id or link.player is None:
                 continue
-            if link.volume_before is None:
+            if link.volume_before is None or link.volume_before == link.volume_target:
                 continue  # we did not turn it up, nothing to undo
             if state != "idle":
                 if link.restore_task is not None:
@@ -550,11 +687,11 @@ class Zone:
             await asyncio.sleep(VOICE_IDLE_HOLD_S)
             if link.lowered and self.streaming and link.player is not None:
                 link.lowered = False
-                link.player.set_volume(self.speaker_volume)
+                link.player.set_volume(link.volume_target)
                 self.log.info(
                     "[%s] voice assistant idle → volume %d",
                     link.cfg.label,
-                    self.speaker_volume,
+                    link.volume_target,
                 )
         except asyncio.CancelledError:
             pass
@@ -629,7 +766,24 @@ class Zone:
 
     # --- lifecycle -------------------------------------------------------------
     async def prepare(self) -> None:
-        """Resolve the voice satellites (before the HA watcher starts)."""
+        """Model/manufacturer for AirPlay and voice satellites (from HA)."""
+        main = self.links[0].cfg
+        if self.report_model and main.token_entity:
+            info = await find_device_info(main.token_entity)
+            raw = (info.get("model") or "").strip()
+            if raw:
+                self.model = model_name(raw)
+                # echo-dot-assist reports its firmware ("hassmic") as the
+                # manufacturer; for known hardware use the real maker.
+                self.manufacturer = next(
+                    (m for p, m in MANUFACTURERS.items() if raw.lower().startswith(p)),
+                    (info.get("manufacturer") or "").strip(),
+                )
+                self.log.info(
+                    "AirPlay reports model '%s' by '%s'", self.model, self.manufacturer
+                )
+        if not self.lower_for_voice:
+            return
         for link in self.links:
             if not link.cfg.satellite_entity and link.cfg.token_entity:
                 link.cfg.satellite_entity = await find_satellite(link.cfg.token_entity)
@@ -690,10 +844,15 @@ class Zone:
         if logging.getLogger().level <= logging.DEBUG:
             cmd.append("-v")
         self.log.info("Starting AirPlay zone '%s' (%s)", self.cfg.name, " ".join(cmd))
+        env = dict(os.environ)
+        if self.model:  # read by the patched shairport-sync (icon in iOS)
+            env["SPS_MODEL"] = self.model
+            env["SPS_MANUFACTURER"] = self.manufacturer
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env,
         )
         stderr_task = asyncio.create_task(self._pump_stderr(proc))
         try:
@@ -760,6 +919,43 @@ class Zone:
             queue.put_nowait(None)  # leave the end marker for _pump_audio
         return item
 
+    async def test_tone(self) -> bool:
+        """Play a short chime on the speaker(s), without AirPlay.
+
+        A stereo pair plays it left first, then right. Returns False if the
+        zone is busy (AirPlay or another test running).
+        """
+        if self.streaming or self._session_lock.locked():
+            return False
+        async with self._session_lock:
+            ready = [link for link in self.links if link.client_id]
+            results = await asyncio.gather(*(self._acquire(link) for link in ready))
+            active = [link for link, ok in zip(ready, results, strict=True) if ok]
+            if not active:
+                return False
+            try:
+                total = TONE_GAP_S * len(active) + 0.4
+                for link in active:
+                    link.stream = link.group.start_stream()
+                start = active[0].stream.now_us() + TONE_LEAD_US
+                step = CHUNK_FRAMES * 4
+                for i, link in enumerate(active):
+                    pcm = chime_pcm(TONE_GAP_S * i, total)
+                    for k in range(0, len(pcm), step):
+                        link.stream.prepare_audio(pcm[k : k + step], PCM_FORMAT)
+                        await link.stream.commit_audio(
+                            play_start_us=start + (k // step) * CHUNK_US
+                        )
+                self.log.info("Test tone on %s", self.cfg.host)
+                await asyncio.sleep(total + TONE_LEAD_US / 1e6 + 0.3)
+            finally:
+                for link in active:
+                    with contextlib.suppress(Exception):
+                        await link.group.stop()
+                    link.group = link.stream = link.player = None
+                    self.side.release(link.cfg)
+            return True
+
     async def _acquire(self, link: Link) -> bool:
         try:
             client, group = await self.side.acquire(link.cfg, link.client_id)
@@ -785,6 +981,12 @@ class Zone:
         return pcm
 
     async def _session(self, queue: asyncio.Queue, first: tuple[int, bytes]) -> None:
+        async with self._session_lock:  # waits for a running test tone
+            await self._session_locked(queue, first)
+
+    async def _session_locked(
+        self, queue: asyncio.Queue, first: tuple[int, bytes]
+    ) -> None:
         ready = [link for link in self.links if link.client_id]
         self.log.info("AirPlay playback started → taking over %s", self.cfg.host)
         results = await asyncio.gather(*(self._acquire(link) for link in ready))
@@ -799,6 +1001,8 @@ class Zone:
             link.stream = link.group.start_stream()
         self.active = active
         self.streaming = True
+        self.stats["sessions"] += 1
+        dropping = False
         self._cover_sent = None
         asyncio.ensure_future(self._push_track(active))
         self._notify()
@@ -831,8 +1035,12 @@ class Zone:
                 if target < now_srv + MIN_LEAD_US:
                     # Arrived during the takeover and is already too late
                     dropped += len(parts)
+                    if sent and not dropping:  # not the normal takeover gap
+                        self.stats["drops"] += 1
+                    dropping = True
                     next_ts = None
                 elif next_ts is None:
+                    dropping = False
                     next_ts = target
                     err_avg = 0.0
                     self.log.info(
@@ -846,6 +1054,7 @@ class Zone:
                     # jumps (skip, pause) or a lasting offset.
                     if abs(err) > HARD_RESYNC_US or abs(err_avg) > SOFT_RESYNC_US:
                         resyncs += 1
+                        self.stats["resyncs"] += 1
                         self.log.debug(
                             "resync: err=%+d µs avg=%+d µs", err, int(err_avg)
                         )
@@ -870,9 +1079,11 @@ class Zone:
                             # one speaker of a pair gone: the other plays on
                             self.log.error("[%s] lost: %s", link.cfg.label, err)
                             self.active.remove(link)
+                            self.stats["lost"] += 1
                             await self._release(link)
                     next_ts += CHUNK_US * len(parts)
                     sent += len(parts)
+                    self.stats["audio_s"] += CHUNK_US * len(parts) / 1e6
 
                 if loop.time() - last_report >= 10:
                     self.log.info(
@@ -884,6 +1095,8 @@ class Zone:
                         err_avg / 1000,
                     )
                     last_report = loop.time()
+                    self._follow_target()  # night mode starting/ending
+                    self._notify()
 
                 item = await self._next(queue)
             self.log.info("AirPlay paused/ended → releasing the speaker(s)")
@@ -937,7 +1150,17 @@ def zone_config(index: int, z: dict) -> ZoneConfig:
         speakers=speakers,
         latency_offset_ms=int(z.get("latency_offset_ms") or 0),
         volume_trim_db=min(0.0, float(z.get("volume_trim_db") or 0)),
+        speaker_volume=_opt_int(z.get("speaker_volume")),
+        night_volume=_opt_int(z.get("night_volume")),
+        night_start=z.get("night_start") or "22:00",
+        night_end=z.get("night_end") or "07:00",
     )
+
+
+def _opt_int(value) -> int | None:
+    if value in (None, ""):
+        return None
+    return max(0, min(100, int(value)))
 
 
 async def main() -> None:
@@ -963,10 +1186,15 @@ async def main() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
 
-    # Voice satellites: turn the speaker back down while the assistant is active
+    # HA's time zone (night mode) and language (entity names)
+    ha_cfg = await ha_config()
+    if ha_cfg.get("time_zone"):
+        os.environ["TZ"] = ha_cfg["time_zone"]
+        time.tzset()
+    # Model for the AirPlay icon, voice satellites
+    await asyncio.gather(*(z.prepare() for z in zones))
     background: list[asyncio.Task] = []
     if opts.get("lower_volume_during_voice", True):
-        await asyncio.gather(*(z.prepare() for z in zones))
         by_entity: dict[str, Zone] = {
             link.cfg.satellite_entity: z
             for z in zones
@@ -991,7 +1219,7 @@ async def main() -> None:
             zones,
             save_zone_option,
             os.environ.get("ADDON_VERSION", "dev"),
-            await ha_language(),
+            str(ha_cfg.get("language") or "en").split("-")[0],
             broker_from_options(opts),
         )
         try:

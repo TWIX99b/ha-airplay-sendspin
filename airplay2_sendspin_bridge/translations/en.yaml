@@ -38,6 +38,12 @@ configuration:
       While the speaker's voice assistant listens or answers, the speaker gets
       its old volume back, so the reply doesn't come at AirPlay volume. Finds
       the satellite via token_entity.
+  report_model:
+    name: Report the real model
+    description: >-
+      Tells AirPlay the real model and manufacturer (e.g. "Echo 2" by Amazon)
+      instead of "ShairportSync". iOS picks the icon in the AirPlay menu from
+      it. Takes effect after a restart.
   metadata:
     name: Pass on title and cover
     description: >-

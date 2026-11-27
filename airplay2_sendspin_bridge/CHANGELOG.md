@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.0
+
+- **Real model in AirPlay:** shairport-sync is patched at build time so each
+  speaker reports its real model and manufacturer from HA (e.g. "Echo 2" by
+  Amazon) instead of "ShairportSync", like a Sonos does; iOS picks the icon
+  from it. Option `report_model` (default on). No Apple model is faked.
+- **Test tone** per speaker (♪ on the tile): chime straight via Sendspin,
+  without AirPlay; stereo pairs left, then right. API POST /api/zones/{i}/test.
+- **Connection quality** on the tile (resyncs, gaps, lost speakers since
+  start, per hour of music) and as MQTT sensor "Aussetzer"/"Dropouts".
+- **Per-speaker AirPlay volume and night mode** (`zones[].speaker_volume`,
+  `night_volume`, `night_start`, `night_end`): live, also during playback,
+  in HA's time zone.
+- Tests for night mode, test tone (pair order) and dropout counting.
+
 ## 0.6.0
 
 - **New add-on page "AirPlay Bridge"** (sidebar) with two tabs:

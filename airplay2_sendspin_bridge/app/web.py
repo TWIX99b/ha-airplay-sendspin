@@ -279,7 +279,10 @@ def create_app(zones: list[Zone]) -> web.Application:
                     "lead_ms": z.lead_ms(),
                     "trim_db": z.cfg.volume_trim_db,
                     "speaker_volume": z.echo_volume,
-                    "speaker_volume_target": z.speaker_volume,
+                    "speaker_volume_target": z.target_volume(),
+                    "night_active": z.night_active(),
+                    "model": z.model,
+                    "stats": z.stats,
                     "playing": z.streaming,
                 }
                 for z in zones
@@ -360,12 +363,9 @@ def create_app(zones: list[Zone]) -> web.Application:
             raise web.HTTPBadGateway(text="saving the options failed")
         if restart:
             asyncio.ensure_future(restart_self())
-        else:  # only offset / trim changed: apply live
+        else:  # only offset / trim / volume settings changed: apply live
             for zone, cfg in zip(zones, new, strict=False):
-                if zone.cfg.latency_offset_ms != cfg["latency_offset_ms"]:
-                    zone.set_offset(cfg["latency_offset_ms"])
-                if zone.cfg.volume_trim_db != cfg["volume_trim_db"]:
-                    zone.set_trim(cfg["volume_trim_db"])
+                zone.apply_settings(cfg)
         return web.json_response({"restart": restart})
 
     async def discover(_request: web.Request) -> web.Response:
@@ -379,7 +379,15 @@ def create_app(zones: list[Zone]) -> web.Application:
     app.router.add_get("/api/config", get_config)
     app.router.add_put("/api/config", put_config)
     app.router.add_get("/api/discover", discover)
+
+    async def test_tone(request: web.Request) -> web.Response:
+        zone = zone_or_404(request)
+        if not await zone.test_tone():
+            raise web.HTTPConflict(text="speaker busy or not paired")
+        return web.json_response({"ok": True})
+
     app.router.add_get("/api/zones/{index}/cover", cover)
+    app.router.add_post("/api/zones/{index}/test", test_tone)
     app.router.add_get("/sync-click.wav", click)
     app.router.add_get("/level-noise.wav", level_track)
     app.router.add_get("/api/zones", list_zones)
