@@ -210,9 +210,11 @@ async def test_pair_session():
         link.client_id = "id-" + link.cfg.host
     zone.track = metadata.TrackInfo(title="Song", artist="Band", cover=None)
     queue = asyncio.Queue()
-    for _ in range(10):
-        queue.put_nowait((bridge.mono_us(), stereo_chunk(111, 222)))
-    await zone._session(queue, (bridge.mono_us(), stereo_chunk(111, 222)))
+    now = bridge.mono_us()
+    # chunks arrive every 20 ms (the time base needs steady arrivals)
+    for i in range(1, 40):
+        queue.put_nowait((now + i * 20_000, stereo_chunk(111, 222)))
+    await zone._session(queue, (now, stereo_chunk(111, 222)))
     a, b = side.groups["A"].stream.commits, side.groups["B"].stream.commits
     check(len(a) > 0 and len(a) == len(b), "pair: both speakers got every commit")
     check(all(x[0] == y[0] for x, y in zip(a, b, strict=True)), "pair: same play time")
@@ -534,14 +536,42 @@ async def test_stats():
     zone.links[0].client_id = "x"
     queue = asyncio.Queue()
     now = bridge.mono_us()
-    for _ in range(4):  # first batch: first + 4 = MAX_BATCH chunks
-        queue.put_nowait((now, stereo_chunk(1, 1)))
-    # a big jump in arrival time = an audible hiccup (resync)
-    queue.put_nowait((now + 2_000_000, stereo_chunk(1, 1)))
+    for i in range(1, 40):
+        queue.put_nowait((now + i * 20_000, stereo_chunk(1, 1)))
+    # a big jump in arrival time (skip, flush) = a new time line
+    for i in range(40):
+        queue.put_nowait((now + 3_000_000 + i * 20_000, stereo_chunk(1, 1)))
     await zone._session(queue, (now, stereo_chunk(1, 1)))
     check(zone.stats["sessions"] == 1, "stats: one session")
     check(zone.stats["resyncs"] >= 1, "stats: hiccup counted")
     check(zone.stats["audio_s"] > 0.1, "stats: audio time")
+
+
+async def test_timing_steady():
+    """Every chunk gets base + i·20 ms: no session-specific random anchor."""
+    cfg = bridge.zone_config(0, {"name": "W", "host": "A", "port": 1})
+    side = FakeSide({"A": 50})
+    zone = bridge.Zone(cfg, side, OPTS)
+    zone.links[0].client_id = "x"
+    queue = asyncio.Queue()
+    now = bridge.mono_us()
+    # lead-in burst (back to back), then steady arrivals 0–8 ms late
+    import random
+
+    rng = random.Random(4)
+    for i in range(1, 50):
+        queue.put_nowait((now + i * 30, stereo_chunk(0, 0)))
+    for i in range(50, 150):
+        late = rng.uniform(0, 8_000)
+        queue.put_nowait((now + 400_000 + i * 20_000 + int(late), stereo_chunk(5, 5)))
+    await zone._session(queue, (now, stereo_chunk(0, 0)))
+    commits = side.groups["A"].stream.commits
+    times = [c[0] for c in commits]
+    sizes = [len(c[1]) // bridge.CHUNK_BYTES for c in commits]
+    # consecutive commits continue exactly where the previous one ended
+    gaps = [t2 - (t1 + n * bridge.CHUNK_US) for t1, t2, n in zip(times, times[1:], sizes)]
+    check(max(abs(g) for g in gaps) <= 300, "timing: commits are contiguous")
+    check(zone.stats["resyncs"] == 0, "timing: no restarts in a steady stream")
 
 
 test_config()
@@ -550,6 +580,7 @@ test_night_and_volume()
 asyncio.run(test_follow_night())
 asyncio.run(test_tone_pair())
 asyncio.run(test_stats())
+asyncio.run(test_timing_steady())
 test_pick_channel()
 asyncio.run(test_pair_session())
 asyncio.run(test_voice())

@@ -4,8 +4,10 @@ Speakers tab: tiles with status, track, offset and volume; add speakers
 suggested from Home Assistant (echo-dot-assist devices), edit and remove
 them. They are stored in the add-on options (speakers.py).
 
-Flow on the calibration page (in the browser):
-  1. A click track (1 click per second) plays via AirPlay to the group
+Calibration page, mode "by ear": the click track plays via AirPlay to the
+group "speaker + reference"; ± buttons change latency_offset_ms live, Save
+stores it. Mode "with microphone" (best on a second device, 3 rounds):
+  1. A click track (1 click per second, 10 min) plays via AirPlay to the group
      "speaker + reference speaker" (HomePod/Sonos).
   2. The browser records through the microphone. The page first mutes the
      zone (phase A: reference speaker only), then unmutes it (phase B: both).
@@ -59,12 +61,15 @@ STATIC = Path(__file__).parent / "static"
 OPTIONS_FILE = Path("/data/options.json")
 
 BOOT_ID = f"{time.time():.0f}-{os.getpid()}"  # changes with every (re)start
-CLICK_RATE = 48_000
-CLICK_SECONDS = 90
+# 10 minutes without a loop: a loop restart makes iOS flush AirPlay, which
+# used to disturb measurements. 22.05 kHz keeps the file small (≈26 MB,
+# streamed) and still has the full click (2.5–6.3 kHz).
+CLICK_RATE = 22_050
+CLICK_SECONDS = 600
 
 
 def build_click_wav() -> bytes:
-    """90 s, one short broadband click per second (48 kHz, 16 bit, mono)."""
+    """10 min, one short broadband click per second (16 bit, mono)."""
     n_click = int(CLICK_RATE * 0.004)  # 4 ms
     click = []
     for i in range(n_click):
@@ -246,6 +251,8 @@ def zone_state(z) -> dict:
         "cover": cover_key(t.cover if t else None),
         "offset_ms": z.cfg.latency_offset_ms,
         "lead_ms": z.lead_ms(),
+        "sync_locked": bool(getattr(z, "sync_locked", False)),
+        "sync_error_ms": round(float(getattr(z, "sync_error_ms", 0.0)), 1),
         "trim_db": z.cfg.volume_trim_db,
         "speaker_volume": z.echo_volume,
         "speaker_volume_target": z.target_volume(),

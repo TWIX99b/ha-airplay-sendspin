@@ -79,6 +79,7 @@ jobs:
           python tests/test_calibration.py
           python tests/test_volume_matching.py
           python tests/test_features.py
+          python tests/test_timebase.py
           python tests/test_addon_api.py
 
   integration:

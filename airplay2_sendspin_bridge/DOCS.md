@@ -118,42 +118,49 @@ zones:
 | `zones[].speaker_volume` | AirPlay-Lautstärke dieses Lautsprechers in %, überschreibt `speaker_volume`. |
 | `zones[].night_volume`, `night_start`, `night_end` | Nachtmodus: zwischen Start und Ende höchstens so viel % (z. B. 40, 22:00, 07:00). |
 
-### Automatisch einmessen
+### Zeit einmessen
 
-Das Add-on hat eine eigene Seite **„AirPlay Bridge“** (Reiter **Einmessen**) in der HA-Seitenleiste
-bzw. unter „Web-UI öffnen“. Dort misst es per Mikrofon den Versatz eines
-Lautsprechers gegenüber einem HomePod oder einer Sonos und stellt ihn automatisch ein.
+Das Add-on hat eine eigene Seite **„AirPlay Bridge“** (Reiter **Einmessen**)
+in der HA-Seitenleiste bzw. unter „Web-UI öffnen“. Dort stellst du ein, wie
+viele Millisekunden ein Echo früher oder später spielt, damit er mit einem
+HomePod oder einer Sonos zusammenpasst.
 
-1. Die Audioausgabe des Geräts auf die AirPlay-Gruppe stellen. Den
-   **Klick-Track** startet die Seite beim Messen selbst (oder vorher mit
-   **▶ Abspielen**; alternativ `sync-click.wav` herunterladen und z. B. in
-   der Musik-App abspielen).
-2. Abgespielt wird per AirPlay auf die Gruppe aus **Lautsprecher + Referenz (HomePod/Sonos)**
-   abspielen, z. B. mit der Musik-App am Mac oder iPhone.
-3. Das Gerät mit der Seite **ungefähr gleich weit von beiden** Lautsprechern
-   hinlegen, beide etwa gleich laut. Dann auf **Messen** tippen. Das dauert
-   etwa 20 Sekunden.
-4. Die Seite schaltet den Lautsprecher erst stumm (nur die Referenz klickt), dann
-   wieder an (beide klicken), und berechnet daraus den Versatz auf etwa 1–2 ms
-   genau.
-5. **Übernehmen & speichern**: Der neue Wert wirkt sofort und wird in den
-   Add-on-Optionen gespeichert. Zur Kontrolle einfach nochmal messen.
+1. **Lautsprecher wählen.** Die Seite zeigt, ob er gerade spielt und ob der
+   Takt eingerastet ist.
+2. **Klick-Track abspielen** (ein Klick pro Sekunde, 10 Minuten, ohne
+   Schleife) per AirPlay auf die Gruppe aus **Echo + Referenz
+   (HomePod/Sonos)**: iPhone/iPad über Kontrollzentrum → AirPlay, Mac über
+   Menüleiste › Ton. Oder `sync-click.wav` herunterladen und in der
+   Musik-App abspielen.
+3. **Angleichen**, auf eine von zwei Arten:
+
+**Nach Gehör (Standard):** Etwa gleich weit von beiden Lautsprechern
+hinstellen. Passt alles, ist nur ein Klick zu hören; „klick-klick“ heißt,
+der Echo ist daneben. Mit **−20/−5/+5/+20 ms** angleichen (minus = Echo
+früher, plus = später, nach 2–3 Sekunden hörbar). Die Seite zeigt, ob der
+aktuelle Wert gespeichert ist; **Speichern** bestätigt es ausdrücklich.
+„Zurück zum gespeicherten Wert“ verwirft Versuche, für bekannte Modelle gibt
+es den Standardwert per Knopf.
+
+**Mit Mikrofon:** Den Track auf einem Gerät abspielen (z. B. iPhone), die
+Seite auf einem **zweiten Gerät** öffnen (iPad, Mac) und mittig hinlegen.
+Das Messgerät spielt selbst nichts ab, so kann das Mikrofon die Wiedergabe
+nicht stören. **Messen** wartet, bis der Takt eingerastet ist, und misst dann
+dreimal (je Echo stumm / Echo an, ca. 1 Minute). Passen die Runden nicht
+zusammen (mehr als 8 ms auseinander) oder ist das Signal zu schwach, schlägt
+die Seite nichts vor. Sonst: **Übernehmen, speichern & prüfen** – danach
+läuft automatisch eine Prüfmessung.
 
 Hinweise:
-- Der Browser gibt das Mikrofon nur über **HTTPS** frei, also z. B. über die
-  externe HA-Adresse. Klappt es nicht, die Seite über „In neuem Tab öffnen“
-  aufrufen.
-- Abspielen und Messen klappen auch auf demselben iPhone. Bricht die
-  AirPlay-Wiedergabe beim Einschalten des Mikrofons doch ab, meldet die Seite
-  das; dann den Track auf einem zweiten Gerät abspielen.
-- Liegt das Ergebnis innerhalb von **±5 ms** (Lautstärke: **±1 dB**), zeigt
-  die Seite „✓ Passt“. Mit „Wert bestätigen & speichern“ wird der aktuelle
-  Wert dann unverändert gespeichert.
-- Jeder Meter Abstandsunterschied zum Mikrofon verfälscht um etwa 3 ms.
-  Deshalb das Gerät in die Mitte legen.
-- Von Hand geht es auch: `latency_offset_ms` in Schritten von 20–50 ms
-  verstellen, bis Klatschen oder Schlagzeug nicht mehr doppelt klingt. Auf
-  der Seite gibt es dafür auch ±-Knöpfe, die sofort wirken.
+- Seit 0.9 rastet die Bridge in jeder AirPlay-Sitzung auf denselben Takt ein
+  (auf etwa ±1 ms). Vorher landete jede Sitzung zufällig ein paar zehn
+  Millisekunden daneben – Einmessen war deshalb kaum reproduzierbar. **Nach
+  dem Update die Werte einmal neu prüfen.**
+- Der Browser gibt das Mikrofon nur über **HTTPS** frei (z. B. externe
+  HA-Adresse). Für „Nach Gehör“ ist das egal.
+- Jeder Meter Abstandsunterschied macht etwa 3 ms aus.
+- Bricht die Wiedergabe während der Messung ab oder startet neu, meldet die
+  Seite das, statt einen falschen Wert vorzuschlagen.
 
 ### Lautstärke angleichen
 
@@ -269,7 +276,7 @@ leiser, außer er wurde am Gerät selbst verstellt. Es gilt die Zeitzone von HA.
 
 ### Messwerte (Info)
 
-Gemessene bzw. abgehörte Werte als Orientierung. Die Einmessung ersetzt sie,
+Gemessene bzw. abgehörte Werte als Orientierung (vor 0.9 ermittelt, bitte neu prüfen). Die Einmessung ersetzt sie,
 denn die Lautstärke hängt auch von Raum und Referenz ab. Weitere Werte gern per Issue melden.
 
 | Lautsprecher | Software | Referenz | `latency_offset_ms` | `volume_trim_db` | Methode | Datum |
@@ -384,39 +391,45 @@ edited there by hand.
 | `zones[].speaker_volume` | AirPlay volume of this speaker in %, overrides `speaker_volume`. |
 | `zones[].night_volume`, `night_start`, `night_end` | Night mode: at most this % between start and end (e.g. 40, 22:00, 07:00). |
 
-### Automatic calibration
+### Calibrating the timing
 
-The add-on has its own page **"AirPlay Bridge"** (tab **Calibrate**) in the HA sidebar or via
-"Open Web UI". It uses the microphone to measure a speaker's offset against a
-HomePod or Sonos and sets it automatically.
+The add-on has its own page **"AirPlay Bridge"** (tab **Calibrate**) in the
+HA sidebar or via "Open Web UI". There you set how many milliseconds an Echo
+plays earlier or later so it matches a HomePod or Sonos.
 
-1. Set the device's audio output to the AirPlay group. The page starts the
-   **click track** itself when measuring (or start it with **▶ Play**;
-   alternatively download `sync-click.wav` and play it e.g. in the Music
-   app).
-2. It plays via AirPlay to the group **speaker + reference (HomePod/Sonos)**, e.g. with
-   the Music app on Mac or iPhone.
-3. Put the device showing the page **roughly the same distance from both**
-   speakers, both at about the same volume. Then tap **Measure**. It takes
-   about 20 seconds.
-4. The page first mutes the speaker (only the reference clicks), then unmutes it
-   (both click), and computes the offset to within about 1–2 ms.
-5. **Apply & save**: the new value takes effect immediately and is saved in
-   the add-on options. Measure again to verify.
+1. **Choose the speaker.** The page shows whether it is playing and whether
+   the timing has locked.
+2. **Play the click track** (one click per second, 10 minutes, no loop) via
+   AirPlay to the group **Echo + reference (HomePod/Sonos)**: iPhone/iPad via
+   Control Center → AirPlay, Mac via menu bar › Sound. Or download
+   `sync-click.wav` and play it in the Music app.
+3. **Match**, in one of two ways:
+
+**By ear (default):** Stand about the same distance from both speakers. When
+it matches you hear a single click; "click-click" means the Echo is off.
+Adjust with **−20/−5/+5/+20 ms** (minus = Echo earlier, plus = later,
+audible after 2–3 seconds). The page shows whether the current value is
+saved; **Save** confirms it explicitly. "Back to the saved value" discards
+experiments; known models have a button for their default.
+
+**With microphone:** Play the track on one device (e.g. iPhone), open the page
+on a **second device** (iPad, Mac) and put it in the middle. The measuring
+device plays nothing itself, so the microphone cannot disturb playback.
+**Measure** waits for the timing to lock and then measures three times (Echo
+muted / Echo on each, about 1 minute). If the rounds disagree (more than
+8 ms apart) or the signal is too weak, the page suggests nothing. Otherwise:
+**Apply, save & verify** – a verification run follows automatically.
 
 Notes:
-- Browsers only allow the microphone over **HTTPS**, e.g. via your external
-  HA address. If it doesn't work, use "Open in new tab".
-- Playing and measuring also work on the same iPhone. If AirPlay playback
-  stops when the microphone turns on, the page tells you; then play the
-  track on a second device.
-- If the result is within **±5 ms** (volume: **±1 dB**), the page shows
-  "✓ Good". "Confirm & save value" then saves the current value unchanged.
-- Every metre of distance difference to the microphone skews the result by
-  about 3 ms, so place the device in between.
-- Manual tuning also works: adjust `latency_offset_ms` in 20–50 ms steps
-  until claps or drums no longer sound doubled. The page has ± buttons for
-  this too, which take effect immediately.
+- Since 0.9 the bridge locks onto the same timing in every AirPlay session
+  (to about ±1 ms). Before, every session landed randomly a few tens of
+  milliseconds off, which made calibration hardly reproducible. **Check your
+  values once after the update.**
+- Browsers only allow the microphone over **HTTPS** (e.g. external HA
+  address). "By ear" works without it.
+- Every metre of distance difference is about 3 ms.
+- If playback stops or restarts during a measurement, the page says so
+  instead of suggesting a wrong value.
 
 ### Volume matching
 
@@ -529,7 +542,7 @@ device itself. HA's time zone applies.
 
 ### Measured values (info)
 
-Measured or by-ear values as a starting point. The calibration replaces
+Measured or by-ear values as a starting point (found before 0.9, please re-check). The calibration replaces
 them, since volume also depends on the room and the reference. Feel free to report more values via an issue.
 
 | Speaker | Software | Reference | `latency_offset_ms` | `volume_trim_db` | Method | Date |
