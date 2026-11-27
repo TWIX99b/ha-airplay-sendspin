@@ -4,8 +4,10 @@ Speakers tab: tiles with status, track, offset and volume; add speakers
 suggested from Home Assistant (echo-dot-assist devices), edit and remove
 them. They are stored in the add-on options (speakers.py).
 
-Flow on the calibration page (in the browser):
-  1. A click track (1 click per second) plays via AirPlay to the group
+Calibration page, mode "by ear": the click track plays via AirPlay to the
+group "speaker + reference"; ± buttons change latency_offset_ms live, Save
+stores it. Mode "with microphone" (best on a second device, 3 rounds):
+  1. A click track (1 click per second, 10 min) plays via AirPlay to the group
      "speaker + reference speaker" (HomePod/Sonos).
   2. The browser records through the microphone. The page first mutes the
      zone (phase A: reference speaker only), then unmutes it (phase B: both).
@@ -59,12 +61,15 @@ STATIC = Path(__file__).parent / "static"
 OPTIONS_FILE = Path("/data/options.json")
 
 BOOT_ID = f"{time.time():.0f}-{os.getpid()}"  # changes with every (re)start
-CLICK_RATE = 48_000
-CLICK_SECONDS = 90
+# 10 minutes without a loop: a loop restart makes iOS flush AirPlay, which
+# used to disturb measurements. 22.05 kHz keeps the file small (≈26 MB,
+# streamed) and still has the full click (2.5–6.3 kHz).
+CLICK_RATE = 22_050
+CLICK_SECONDS = 600
 
 
 def build_click_wav() -> bytes:
-    """90 s, one short broadband click per second (48 kHz, 16 bit, mono)."""
+    """10 min, one short broadband click per second (16 bit, mono)."""
     n_click = int(CLICK_RATE * 0.004)  # 4 ms
     click = []
     for i in range(n_click):
@@ -88,6 +93,7 @@ def build_click_wav() -> bytes:
     return buf.getvalue()
 
 
+LEVEL_RATE = 48_000  # the bridge analyses this track at 48 kHz
 LEVEL_CYCLE_S = 5.0
 LEVEL_NOISE_S = 1.5
 
@@ -120,7 +126,7 @@ def _rbj(kind: str, f0: float, sr: int, q: float = 0.7071) -> tuple:
 def build_level_wav() -> bytes:
     """90 s: 1.5 s pink noise (200 Hz – 6 kHz, −18 dBFS RMS), 3.5 s silence."""
     rnd = random.Random(20261126)
-    n = int(CLICK_RATE * LEVEL_NOISE_S)
+    n = int(LEVEL_RATE * LEVEL_NOISE_S)
     b0 = b1 = b2 = b3 = b4 = b5 = b6 = 0.0
     pink = []
     for _ in range(n + 4800):  # Paul Kellet's pink-noise filter, 100 ms run-in
@@ -134,22 +140,22 @@ def build_level_wav() -> bytes:
         pink.append(b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362)
         b6 = w * 0.115926
     for kind, f0 in (("hp", 200), ("hp", 200), ("lp", 6000), ("lp", 6000)):
-        pink = _biquad(pink, *_rbj(kind, f0, CLICK_RATE))
+        pink = _biquad(pink, *_rbj(kind, f0, LEVEL_RATE))
     pink = pink[4800:]
     rms = math.sqrt(sum(v * v for v in pink) / n)
     gain = 32767 * 10 ** (-18 / 20) / rms
-    fade = int(CLICK_RATE * 0.02)
+    fade = int(LEVEL_RATE * 0.02)
     samples = []
     for i, v in enumerate(pink):
         env = min(1.0, i / fade, (n - 1 - i) / fade)
         samples.append(max(-32767, min(32767, int(v * gain * env))))
-    silence = b"\x00\x00" * (int(CLICK_RATE * LEVEL_CYCLE_S) - n)
+    silence = b"\x00\x00" * (int(LEVEL_RATE * LEVEL_CYCLE_S) - n)
     cycle = struct.pack(f"<{n}h", *samples) + silence
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)
-        wav.setframerate(CLICK_RATE)
+        wav.setframerate(LEVEL_RATE)
         wav.writeframes(cycle * int(CLICK_SECONDS / LEVEL_CYCLE_S))
     return buf.getvalue()
 
@@ -246,6 +252,8 @@ def zone_state(z) -> dict:
         "cover": cover_key(t.cover if t else None),
         "offset_ms": z.cfg.latency_offset_ms,
         "lead_ms": z.lead_ms(),
+        "sync_locked": bool(getattr(z, "sync_locked", False)),
+        "sync_error_ms": round(float(getattr(z, "sync_error_ms", 0.0)), 1),
         "trim_db": z.cfg.volume_trim_db,
         "speaker_volume": z.echo_volume,
         "speaker_volume_target": z.target_volume(),

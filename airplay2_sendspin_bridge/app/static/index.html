@@ -49,6 +49,9 @@
   .err { background:var(--badbg); color:var(--bad); }
   .bar { height:10px; background:var(--soft); border-radius:99px; overflow:hidden; margin:10px 0 4px; }
   .bar > div { height:100%; width:0; background:var(--acc); transition:width .25s linear; }
+  .seg { display:inline-flex; background:var(--soft); border-radius:12px; padding:3px; margin:0 0 12px; }
+  .seg button { background:transparent; color:var(--fg); margin:0; border-radius:10px; padding:7px 14px; }
+  .seg button.active { background:var(--acc); color:#fff; }
   .big { font-size:1.5rem; font-weight:650; margin:6px 0; }
   .muted { color:var(--muted); font-size:.9rem; }
   .ok { color:var(--ok); } .warn { color:var(--warn); }
@@ -144,55 +147,67 @@
       <div class="calsel"><select id="zone"></select>
       <span id="state" class="pill off"></span></div>
     </div>
-    <p class="muted" id="current"></p>
+    <p class="muted" id="syncLine"></p>
   </div>
 
   <div class="card">
     <h2 data-t="step2"></h2>
-    <ol>
-      <li><span data-t="i1"></span>
-        <div class="player">
-          <button class="sec play" data-audio="clickAudio" data-t="play"></button>
-          <a href="sync-click.wav" download="sync-click.wav" data-t="download"></a>
-        </div>
-        <span class="muted" data-t="playHint"></span>
-        <audio id="clickAudio" src="sync-click.wav" loop preload="none" x-webkit-airplay="allow"></audio>
-      </li>
-      <li data-t="i2"></li>
-      <li data-t="i3"></li>
-      <li data-t="i4"></li>
-    </ol>
+    <p data-t="i1"></p>
+    <div class="player">
+      <button class="sec play" data-audio="clickAudio" data-t="play"></button>
+      <a href="sync-click.wav" download="sync-click.wav" data-t="download"></a>
+    </div>
+    <p class="muted" data-t="playHint"></p>
+    <audio id="clickAudio" src="sync-click.wav" preload="none" x-webkit-airplay="allow"></audio>
   </div>
 
   <div class="card">
     <h2 data-t="step3"></h2>
-    <button id="start" data-t="start"></button>
-    <div class="bar"><div id="prog"></div></div>
-    <div class="muted" id="phase"></div>
-  </div>
-
-  <div class="card" id="result" hidden>
-    <h2 data-t="result"></h2>
-    <div class="big" id="resBig"></div>
-    <div id="resText"></div>
-    <div class="muted" id="resQual"></div>
-    <div class="row" style="margin-top:10px">
-      <button id="apply" data-t="apply"></button>
-      <button class="sec" id="again" data-t="again"></button>
+    <div class="seg" id="modeSeg">
+      <button data-mode="ear" class="active" data-t="modeEar"></button><button data-mode="mic" data-t="modeMic"></button>
     </div>
-    <div class="muted" id="applied"></div>
-  </div>
 
-  <div class="card">
-    <h2 data-t="manual"></h2>
-    <div class="row">
-      <button class="sec" data-step="-20">−20 ms</button>
-      <button class="sec" data-step="-5">−5 ms</button>
-      <button class="sec" data-step="5">+5 ms</button>
-      <button class="sec" data-step="20">+20 ms</button>
-      <button id="saveManual" data-t="save"></button>
+    <div id="earMode">
+      <p data-t="earHint"></p>
+      <div class="big" id="offBig"></div>
+      <div class="muted" id="offSaved"></div>
+      <div class="row" style="margin-top:8px">
+        <button class="sec" data-step="-20">− 20 ms</button>
+        <button class="sec" data-step="-5">− 5 ms</button>
+        <button class="sec" data-step="5">+ 5 ms</button>
+        <button class="sec" data-step="20">+ 20 ms</button>
+      </div>
+      <p class="muted" data-t="stepHint"></p>
+      <div class="row">
+        <button id="saveManual" data-t="save"></button>
+        <button class="sec" id="revert" data-t="revert"></button>
+        <button class="sec" id="useDefault" hidden></button>
+      </div>
+      <div class="muted" id="earMsg"></div>
+      <p class="muted" data-t="earTips"></p>
     </div>
-    <p class="muted" data-t="manualHint"></p>
+
+    <div id="micMode" hidden>
+      <ol>
+        <li data-t="m1"></li>
+        <li data-t="m2"></li>
+        <li data-t="m3"></li>
+      </ol>
+      <button id="start" data-t="start"></button>
+      <button class="sec" id="cancel" data-t="cancelMeas" hidden></button>
+      <div class="bar"><div id="prog"></div></div>
+      <div class="muted" id="phase"></div>
+      <div id="result" hidden>
+        <div class="big" id="resBig"></div>
+        <div id="resText"></div>
+        <div class="muted" id="resQual"></div>
+        <div class="row" style="margin-top:10px">
+          <button id="apply" data-t="apply"></button>
+          <button class="sec" id="again" data-t="again"></button>
+        </div>
+      </div>
+      <div class="muted" id="applied"></div>
+    </div>
   </div>
 
   <h3 class="sec" data-t="lvTitle"></h3>
@@ -217,7 +232,7 @@
 
   <div class="card">
     <h2 data-t="lvMeasure"></h2>
-    <button id="lvStart" data-t="start"></button>
+    <button id="lvStart" data-t="lvStart"></button>
     <div class="bar"><div id="lvProg"></div></div>
     <div class="muted" id="lvPhase"></div>
   </div>
@@ -370,42 +385,59 @@ const T = DE ? {
   restartSlow: 'Das dauert länger als gedacht. Seite gleich neu laden.',
   savedLive: 'Gespeichert.', saveFail: 'Speichern hat nicht geklappt: ',
   title: 'Zeit einmessen',
-  subtitle: 'Misst per Mikrofon, wie weit ein Lautsprecher gegenüber einem HomePod/Sonos versetzt ist, und stellt den Versatz automatisch ein.',
+  subtitle: 'Stellt ein, wie viele Millisekunden ein Echo früher oder später spielt, damit er mit HomePod/Sonos zusammenpasst.',
   noMicTitle: 'Kein Mikrofonzugriff',
-  noMicText: 'Der Browser gibt das Mikrofon nur über HTTPS frei, z. B. über deine externe HA-Adresse. Öffne die Seite zur Sicherheit in einem eigenen Tab.',
+  noMicText: 'Der Browser gibt das Mikrofon nur über HTTPS frei, z. B. über deine externe HA-Adresse. Für „Nach Gehör“ ist das egal.',
   newTab: 'In neuem Tab öffnen',
   step1: '1 · Lautsprecher wählen', playing: 'spielt über AirPlay', idle: 'spielt gerade nicht',
-  current: (o) => `Aktueller Feinabgleich: ${o > 0 ? '+' : ''}${o} ms`,
-  step2: '2 · Vorbereiten',
-  i1: 'Klick-Track hier abspielen oder herunterladen:', download: 'Herunterladen',
-  play: '▶ Abspielen', pause: '■ Stoppen',
-  playHint: 'Vorher die Audioausgabe des Geräts auf die AirPlay-Gruppe stellen (iPhone/iPad: Kontrollzentrum, Mac: Menüleiste › Ton). Bricht die Wiedergabe beim Messen ab (meldet die Seite), den Track auf einem zweiten Gerät abspielen.',
-  interrupted: 'Die AirPlay-Wiedergabe wurde während der Messung unterbrochen – vermutlich durch das Mikrofon. Den Track auf einem anderen Gerät oder mit der Musik-App abspielen und nochmal messen.',
-  i2: 'Abgespielt wird per AirPlay auf die Gruppe aus diesem Lautsprecher und einer Referenz (HomePod/Sonos).',
-  i3: 'Das Gerät mit dieser Seite ungefähr gleich weit von beiden Lautsprechern entfernt hinlegen, ruhig sein.',
-  i4: 'Beide Lautsprecher etwa gleich laut einstellen und auf Messen tippen. Läuft noch nichts, startet die Seite den Klick-Track selbst und stoppt ihn danach.',
-  step3: '3 · Messen (ca. 20 Sekunden)', start: 'Messen',
-  phA: 'Phase 1/2: Lautsprecher stumm – nur der Referenz-Lautsprecher klickt …',
-  phB: 'Phase 2/2: Lautsprecher wieder an – beide klicken …',
-  analyse: 'Werte aus …',
+  syncIdle: 'Spielt gerade nicht – Klick-Track starten (Schritt 2).',
+  syncSettling: 'Läuft · Takt rastet ein …',
+  syncLocked: (e) => `Läuft · Takt eingerastet (${e >= 0 ? '+' : '−'}${Math.abs(e).toFixed(1).replace('.', ',')} ms)`,
+  step2: '2 · Klick-Track abspielen',
+  i1: 'Ein Klick pro Sekunde, 10 Minuten lang. Per AirPlay auf die Gruppe aus diesem Echo und einer Referenz (HomePod/Sonos) spielen.',
+  download: 'Herunterladen', play: '▶ Abspielen', pause: '■ Stoppen',
+  playHint: 'iPhone/iPad: Kontrollzentrum → AirPlay → Echo und Referenz anhaken. Mac: Menüleiste › Ton. Du kannst den Track auch herunterladen und mit der Musik-App abspielen.',
+  step3: '3 · Angleichen',
+  modeEar: 'Nach Gehör', modeMic: 'Mit Mikrofon',
+  earHint: 'Stell dich etwa gleich weit von beiden Lautsprechern. Passt alles, hörst du einen einzigen Klick. Hörst du „klick-klick“, ist der Echo daneben.',
+  stepHint: 'Minus = Echo spielt früher (wenn er hinterherhinkt), plus = später. Wirkt sofort, nach 2–3 Sekunden hörbar.',
+  offNow: (n) => `Versatz: ${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)} ms`,
+  offSaved: '✓ gespeichert',
+  offUnsaved: (n) => `● noch nicht gespeichert – gespeichert ist ${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)} ms`,
+  save: 'Speichern', revert: 'Zurück zum gespeicherten Wert',
+  useDefault: (m, v) => `Standard für ${m}: ${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)} ms`,
+  savedOk: (n) => `✓ Gespeichert: ${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)} ms. Gilt ab sofort und nach jedem Neustart.`,
+  saveFailed: 'Speichern hat nicht geklappt – der Wert ist nur live aktiv. Add-on-Log prüfen.',
+  earTips: 'Tipps: Beide Lautsprecher ungefähr gleich laut. 1 m Abstandsunterschied macht etwa 3 ms aus. Erst mit 20 ms grob, dann mit 5 ms fein.',
+  m1: 'Klick-Track auf einem Gerät abspielen (Schritt 2), z. B. auf dem iPhone.',
+  m2: 'Diese Seite auf einem zweiten Gerät öffnen (iPad, Mac) und mittig zwischen beide Lautsprecher legen. Das Messgerät spielt nichts ab – so kann das Mikrofon die Wiedergabe nicht stören.',
+  m3: 'Ruhig sein und auf Messen tippen. Gemessen wird dreimal, das Ergebnis ist der Mittelwert.',
+  start: 'Messen (ca. 1 Minute)', cancelMeas: 'Abbrechen',
+  needTrack: 'Der Echo spielt gerade nichts über AirPlay. Erst den Klick-Track starten (Schritt 2).',
+  samePhone: 'Dieses Gerät spielt den Track selbst ab. iOS leitet beim Einschalten des Mikrofons den Ton oft um, dann bricht die Messung ab. Trotzdem hier messen?',
+  waitLock: 'Warte, bis der Takt eingerastet ist …',
+  noLock: 'Der Takt rastet nicht ein. Läuft der Track ohne Unterbrechung? Kurz warten und nochmal messen.',
+  phA: (r, n) => `Runde ${r}/${n}: Echo stumm – nur die Referenz klickt …`,
+  phB: (r, n) => `Runde ${r}/${n}: Echo an – beide klicken …`,
+  analyse: 'Werte aus …', cancelled: 'Abgebrochen.',
+  interrupted: 'Die Wiedergabe ist während der Messung unterbrochen oder neu gestartet worden. Track weiterlaufen lassen und nochmal messen.',
   result: 'Ergebnis',
-  late: (d) => `Der Lautsprecher ist ${d} ms zu spät`,
-  early: (d) => `Der Lautsprecher ist ${d} ms zu früh`,
+  late: (d) => `Der Echo ist ${d} ms zu spät`,
+  early: (d) => `Der Echo ist ${d} ms zu früh`,
   fits: (d) => `✓ Passt – Abweichung ${d > 0 ? '+' : ''}${d} ms (Toleranz ±5 ms)`,
-  keep: (n) => `Der Feinabgleich von <b>${n > 0 ? '+' : ''}${n} ms</b> bleibt.`,
-  confirm: 'Wert bestätigen & speichern',
-  confirmed: (n, s) => `Bestätigt: ${n > 0 ? '+' : ''}${n} ms${s ? ' – gespeichert.' : ' – Speichern hat nicht geklappt.'}`,
-  suggest: (n) => `Neuer Feinabgleich: <b>${n > 0 ? '+' : ''}${n} ms</b>`,
-  qual: (a, b) => `Signalqualität: Referenz ${a.toFixed(1)} · Lautsprecher ${b.toFixed(1)} (gut: Referenz über 4, Lautsprecher über 8)`,
-  bad: 'Messung unsicher – lauter abspielen, Gerät näher oder Umgebung ruhiger und nochmal messen.',
-  apply: 'Übernehmen & speichern', again: 'Nochmal messen',
-  applied: (n, s) => `Übernommen: ${n > 0 ? '+' : ''}${n} ms${s ? ' – gespeichert.' : ' – live aktiv, Speichern hat nicht geklappt.'} Zur Kontrolle einfach nochmal messen.`,
-  manual: 'Von Hand nachjustieren',
-  manualHint: 'Wirkt sofort beim Abspielen. Plus = Lautsprecher später, minus = früher.',
-  save: 'Speichern',
+  keep: (n) => `Der Versatz von <b>${n > 0 ? '+' : ''}${n} ms</b> bleibt.`,
+  suggest: (n) => `Neuer Versatz: <b>${n > 0 ? '+' : ''}${n} ms</b>`,
+  rounds: (l) => `Runden: ${l}`,
+  uneven: (l) => `Die Runden passen nicht zusammen (${l}). Lauter abspielen, ruhiger, Gerät mittig – und nochmal messen.`,
+  bad: 'Die Klicks waren nicht deutlich genug zu hören. Lauter abspielen, Gerät näher oder Umgebung ruhiger und nochmal messen.',
+  qual: (a, b) => `Signalqualität: Referenz ${a.toFixed(1)} · Echo ${b.toFixed(1)} (gut: Referenz über 4, Echo über 8)`,
+  apply: 'Übernehmen, speichern & prüfen', confirm: 'Passt – speichern', again: 'Nochmal messen',
+  verifying: 'Gespeichert. Prüfmessung läuft …',
+  verified: (d) => `Prüfung: Abweichung jetzt ${d > 0 ? '+' : ''}${d} ms`,
   notPlaying: 'Der Lautsprecher hat nach 20 Sekunden noch nichts über AirPlay bekommen. Ist die Audioausgabe des Geräts auf die AirPlay-Gruppe gestellt?',
   starting: 'Starte den Track und warte auf den Lautsprecher …',
   micErr: 'Mikrofon nicht verfügbar: ',
+  lvStart: 'Messen',
   lvTitle: 'Lautstärke angleichen',
   lvSub: 'Misst, wie laut der Lautsprecher im Vergleich zur Referenz ist, und gleicht ihn an. Vorher die Zeit einmessen.',
   lvPrep: '1 · Vorbereiten',
@@ -469,42 +501,59 @@ const T = DE ? {
   restartSlow: 'This takes longer than expected. Reload the page in a moment.',
   savedLive: 'Saved.', saveFail: 'Saving failed: ',
   title: 'Calibrate timing',
-  subtitle: 'Uses the microphone to measure how far a speaker is off compared to a HomePod/Sonos and sets the offset automatically.',
+  subtitle: 'Sets how many milliseconds an Echo plays earlier or later so it matches a HomePod/Sonos.',
   noMicTitle: 'No microphone access',
-  noMicText: 'Browsers only allow the microphone over HTTPS, e.g. via your external HA address. To be safe, open the page in its own tab.',
+  noMicText: 'Browsers only allow the microphone over HTTPS, e.g. via your external HA address. "By ear" works without it.',
   newTab: 'Open in new tab',
   step1: '1 · Choose speaker', playing: 'playing via AirPlay', idle: 'not playing',
-  current: (o) => `Current fine offset: ${o > 0 ? '+' : ''}${o} ms`,
-  step2: '2 · Prepare',
-  i1: 'Play the click track here or download it:', download: 'Download',
-  play: '▶ Play', pause: '■ Stop',
-  playHint: 'First set the device\'s audio output to the AirPlay group (iPhone/iPad: Control Center, Mac: menu bar › Sound). If playback stops while measuring (the page tells you), play the track on a second device.',
-  interrupted: 'AirPlay playback was interrupted during the measurement – probably by the microphone. Play the track on another device or with the Music app and measure again.',
-  i2: 'It plays via AirPlay to a group of this speaker and a reference (HomePod/Sonos).',
-  i3: 'Put the device showing this page roughly the same distance from both speakers; keep quiet.',
-  i4: 'Set both speakers to roughly the same volume and tap Measure. If nothing is playing yet, the page starts the click track itself and stops it afterwards.',
-  step3: '3 · Measure (about 20 s)', start: 'Measure',
-  phA: 'Phase 1/2: speaker muted – only the reference clicks …',
-  phB: 'Phase 2/2: speaker back on – both click …',
-  analyse: 'Analysing …',
+  syncIdle: 'Not playing – start the click track (step 2).',
+  syncSettling: 'Playing · timing settling …',
+  syncLocked: (e) => `Playing · timing locked (${e >= 0 ? '+' : '−'}${Math.abs(e).toFixed(1)} ms)`,
+  step2: '2 · Play the click track',
+  i1: 'One click per second, 10 minutes long. Play it via AirPlay to a group of this Echo and a reference (HomePod/Sonos).',
+  download: 'Download', play: '▶ Play', pause: '■ Stop',
+  playHint: 'iPhone/iPad: Control Center → AirPlay → tick the Echo and the reference. Mac: menu bar › Sound. You can also download the track and play it with the Music app.',
+  step3: '3 · Match',
+  modeEar: 'By ear', modeMic: 'With microphone',
+  earHint: 'Stand about the same distance from both speakers. When it matches you hear one single click. "Click-click" means the Echo is off.',
+  stepHint: 'Minus = the Echo plays earlier (if it lags behind), plus = later. Takes effect at once, audible after 2–3 seconds.',
+  offNow: (n) => `Offset: ${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)} ms`,
+  offSaved: '✓ saved',
+  offUnsaved: (n) => `● not saved yet – saved value is ${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)} ms`,
+  save: 'Save', revert: 'Back to the saved value',
+  useDefault: (m, v) => `Default for ${m}: ${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v)} ms`,
+  savedOk: (n) => `✓ Saved: ${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n)} ms. Applies now and after every restart.`,
+  saveFailed: 'Saving failed – the value is only active live. Check the add-on log.',
+  earTips: 'Tips: both speakers at roughly the same volume. 1 m difference in distance is about 3 ms. Coarse with 20 ms first, then fine with 5 ms.',
+  m1: 'Play the click track on one device (step 2), e.g. the iPhone.',
+  m2: 'Open this page on a second device (iPad, Mac) and put it halfway between both speakers. The measuring device plays nothing – so the microphone cannot disturb playback.',
+  m3: 'Keep quiet and tap Measure. It measures three times; the result is the median.',
+  start: 'Measure (about 1 minute)', cancelMeas: 'Cancel',
+  needTrack: 'The Echo is not playing anything via AirPlay. Start the click track first (step 2).',
+  samePhone: 'This device plays the track itself. iOS often reroutes audio when the microphone starts, then the measurement breaks off. Measure here anyway?',
+  waitLock: 'Waiting for the timing to lock …',
+  noLock: 'The timing does not lock. Is the track playing without interruption? Wait a moment and measure again.',
+  phA: (r, n) => `Round ${r}/${n}: Echo muted – only the reference clicks …`,
+  phB: (r, n) => `Round ${r}/${n}: Echo on – both click …`,
+  analyse: 'Analysing …', cancelled: 'Cancelled.',
+  interrupted: 'Playback was interrupted or restarted during the measurement. Keep the track playing and measure again.',
   result: 'Result',
-  late: (d) => `The speaker is ${d} ms late`,
-  early: (d) => `The speaker is ${d} ms early`,
+  late: (d) => `The Echo is ${d} ms late`,
+  early: (d) => `The Echo is ${d} ms early`,
   fits: (d) => `✓ Good – off by ${d > 0 ? '+' : ''}${d} ms (tolerance ±5 ms)`,
-  keep: (n) => `The fine offset of <b>${n > 0 ? '+' : ''}${n} ms</b> stays.`,
-  confirm: 'Confirm & save value',
-  confirmed: (n, s) => `Confirmed: ${n > 0 ? '+' : ''}${n} ms${s ? ' – saved.' : ' – saving failed.'}`,
-  suggest: (n) => `New fine offset: <b>${n > 0 ? '+' : ''}${n} ms</b>`,
-  qual: (a, b) => `Signal quality: reference ${a.toFixed(1)} · speaker ${b.toFixed(1)} (good: reference above 4, speaker above 8)`,
-  bad: 'Measurement uncertain – play louder, move closer or reduce noise and measure again.',
-  apply: 'Apply & save', again: 'Measure again',
-  applied: (n, s) => `Applied: ${n > 0 ? '+' : ''}${n} ms${s ? ' – saved.' : ' – active now, saving failed.'} Measure again to verify.`,
-  manual: 'Adjust manually',
-  manualHint: 'Takes effect immediately while playing. Plus = speaker later, minus = earlier.',
-  save: 'Save',
+  keep: (n) => `The offset of <b>${n > 0 ? '+' : ''}${n} ms</b> stays.`,
+  suggest: (n) => `New offset: <b>${n > 0 ? '+' : ''}${n} ms</b>`,
+  rounds: (l) => `Rounds: ${l}`,
+  uneven: (l) => `The rounds do not agree (${l}). Play louder, keep quieter, put the device in the middle – and measure again.`,
+  bad: 'The clicks were not clear enough. Play louder, move closer or reduce noise and measure again.',
+  qual: (a, b) => `Signal quality: reference ${a.toFixed(1)} · Echo ${b.toFixed(1)} (good: reference above 4, Echo above 8)`,
+  apply: 'Apply, save & verify', confirm: 'Good – save', again: 'Measure again',
+  verifying: 'Saved. Verifying …',
+  verified: (d) => `Check: now off by ${d > 0 ? '+' : ''}${d} ms`,
   notPlaying: 'The speaker has not received anything via AirPlay after 20 seconds. Is the device\'s audio output set to the AirPlay group?',
   starting: 'Starting the track and waiting for the speaker …',
   micErr: 'Microphone not available: ',
+  lvStart: 'Measure',
   lvTitle: 'Match volume',
   lvSub: 'Measures how loud the speaker is compared to the reference and matches it. Calibrate the timing first.',
   lvPrep: '1 · Prepare',
@@ -553,7 +602,7 @@ async function refresh() {
     const z = zone(); if (!z) return;
     $('state').textContent = z.playing ? T.playing : T.idle;
     $('state').className = 'pill ' + (z.playing ? 'on' : 'off');
-    $('current').textContent = T.current(z.offset_ms);
+    renderCal(z);
     $('lvCurrent').textContent = T.lvCur(z.trim_db, z.speaker_volume, z.speaker_volume_target);
   } catch (e) { /* ignore, try again */ }
 }
@@ -892,22 +941,71 @@ function analyse(x, sr, markA, markB, end) {
   return { delay: Math.round(d), qa, qd };
 }
 
-async function measure() {
-  const z = zone();
-  $('result').hidden = true; $('applied').textContent = '';
-  if (!z) return;
-  $('start').disabled = true;
-  const track = await ensureTrack(z, 'clickAudio', $('phase'));
-  $('start').disabled = false;
-  if (!track.ok) { alert(T.notPlaying); return; }
-  GUARD_S = z.lead_ms / 1000 + 1.0;          // bridge delay + safety margin
-  PHASE_S = Math.max(9.0, GUARD_S + 6.5);    // at least ~6 clicks per phase
+// Offsets measured per model (with the stable time base since 0.9)
+const MODEL_DEFAULTS = { 'Echo 2': -225 };
+const ROUNDS = 3;        // measurement rounds, result = median
+const SPREAD_MS = 8;     // rounds further apart than this are not trusted
+let measuring = null;    // { cancel } while a measurement runs
+let verifyPending = false;
+
+function savedOffset(z) {
+  const c = cfg[z.index];
+  return c ? Number(c.latency_offset_ms || 0) : z.offset_ms;
+}
+function renderCal(z) {
+  $('syncLine').textContent = !z.playing ? T.syncIdle
+    : z.sync_locked ? T.syncLocked(z.sync_error_ms) : T.syncSettling;
+  $('offBig').textContent = T.offNow(z.offset_ms);
+  const saved = savedOffset(z);
+  $('offSaved').textContent = saved === z.offset_ms ? T.offSaved : T.offUnsaved(saved);
+  $('revert').hidden = saved === z.offset_ms;
+  const def = MODEL_DEFAULTS[z.model];
+  const b = $('useDefault');
+  b.hidden = def === undefined || def === z.offset_ms;
+  if (!b.hidden) { b.textContent = T.useDefault(z.model, def); b.dataset.value = def; }
+}
+document.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#modeSeg button').forEach(o => o.classList.toggle('active', o === b));
+  $('earMode').hidden = b.dataset.mode !== 'ear';
+  $('micMode').hidden = b.dataset.mode !== 'mic';
+});
+
+async function zoneNow(index) {
+  const zs = await (await api('api/zones')).json();
+  return zs.find(z => z.index === index);
+}
+class Stop extends Error {}
+async function waitFor(ms, run) {
+  const until = performance.now() + ms;
+  while (performance.now() < until) {
+    if (run.cancel) throw new Stop(T.cancelled);
+    await sleep(Math.min(200, until - performance.now()));
+  }
+}
+async function mute(index, on) {
+  const r = await api(`api/zones/${index}/mute`, { mute: on });
+  if (!r.ok && on) throw new Stop(T.interrupted);
+}
+
+// Record ROUNDS × (Echo muted, Echo on) and analyse every round.
+async function record(z, rounds, run) {
+  $('phase').textContent = T.waitLock;
+  let st = null;
+  for (let i = 0; i < 40; i++) {
+    st = await zoneNow(z.index);
+    if (!st || !st.playing) throw new Stop(T.needTrack);
+    if (st.sync_locked) break;
+    if (i === 39) throw new Stop(T.noLock);
+    await waitFor(500, run);
+  }
+  const resyncs0 = st.stats ? st.stats.resyncs : 0;
+  GUARD_S = st.lead_ms / 1000 + 1.0;         // bridge delay + safety margin
+  PHASE_S = Math.max(8.0, GUARD_S + 6.5);    // at least ~6 clicks per phase
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: {
       echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
-  } catch (e) { stopTrack('clickAudio', track.started); alert(T.micErr + e.message); return; }
-  $('start').disabled = true;
+  } catch (e) { throw new Stop(T.micErr + e.message); }
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   await ctx.resume();
   const sr = ctx.sampleRate, src = ctx.createMediaStreamSource(stream);
@@ -915,42 +1013,97 @@ async function measure() {
   const chunks = []; let count = 0;
   proc.onaudioprocess = (ev) => { const d = new Float32Array(ev.inputBuffer.getChannelData(0)); chunks.push(d); count += d.length; };
   src.connect(proc); proc.connect(ctx.destination);
-
-  const total = 2 * PHASE_S * 1000, t0 = performance.now();
-  const tick = setInterval(() => { $('prog').style.width = Math.min(100, (performance.now() - t0) / total * 100) + '%'; }, 200);
-  let markA = 0, markB = 0, end = 0, alive = true;
+  const total = rounds * 2 * PHASE_S * 1000, t0 = performance.now();
+  const bar = setInterval(() => { $('prog').style.width = Math.min(100, (performance.now() - t0) / total * 100) + '%'; }, 200);
+  const marks = [];
   try {
-    $('phase').textContent = T.phA;
-    await api(`api/zones/${z.index}/mute`, { mute: true }); markA = count;
-    await sleep(PHASE_S * 1000);
-    $('phase').textContent = T.phB;
-    await api(`api/zones/${z.index}/mute`, { mute: false }); markB = count;
-    await sleep(PHASE_S * 1000);
-    end = count;
-    alive = await stillPlaying(z.index);
+    for (let r = 1; r <= rounds; r++) {
+      $('phase').textContent = T.phA(r, rounds);
+      await mute(z.index, true); marks.push(count);
+      await waitFor(PHASE_S * 1000, run);
+      $('phase').textContent = T.phB(r, rounds);
+      await mute(z.index, false); marks.push(count);
+      await waitFor(PHASE_S * 1000, run);
+    }
+    marks.push(count);
   } finally {
-    await api(`api/zones/${z.index}/mute`, { mute: false });
-    stopTrack('clickAudio', track.started);
-    clearInterval(tick); proc.disconnect(); src.disconnect();
+    await api(`api/zones/${z.index}/mute`, { mute: false }).catch(() => {});
+    clearInterval(bar); proc.disconnect(); src.disconnect();
     stream.getTracks().forEach(t => t.stop()); await ctx.close();
-    $('start').disabled = false;
   }
+  const after = await zoneNow(z.index);
+  if (!after || !after.playing || (after.stats && after.stats.resyncs !== resyncs0)) throw new Stop(T.interrupted);
   $('phase').textContent = T.analyse;
+  await sleep(30);
+  const end = marks[marks.length - 1];
   const x = new Float32Array(end); let o = 0;
   for (const c of chunks) { if (o >= end) break; x.set(c.subarray(0, Math.min(c.length, end - o)), o); o += c.length; }
-  if (!alive) { $('phase').textContent = T.interrupted; return; }
-  const r = analyse(x, sr, markA, markB, end);
+  const res = [];
+  for (let r = 0; r < rounds; r++) {
+    const a = analyse(x, sr, marks[2 * r], marks[2 * r + 1], marks[2 * r + 2]);
+    a.good = a.qa > 4 && a.qd > 8;
+    res.push(a);
+  }
+  return res;
+}
+
+function summarise(res) {
+  const good = res.filter(r => r.good);
+  const fmt = (r) => (r.good ? '' : '(') + (r.delay > 0 ? '+' : '') + r.delay + ' ms' + (r.good ? '' : ')');
+  const list = res.map(fmt).join(' · ');
+  const need = Math.min(2, res.length);
+  if (good.length < need) return { ok: false, msg: T.bad, list, res };
+  const d = good.map(r => r.delay).sort((a, b) => a - b);
+  const spread = d[d.length - 1] - d[0];
+  if (spread > SPREAD_MS) return { ok: false, msg: T.uneven(list), list, res };
+  return { ok: true, delay: d[d.length >> 1], list, res };
+}
+
+async function measure(rounds = ROUNDS) {
+  const z = zone(); if (!z || measuring) return;
+  $('result').hidden = true; $('applied').textContent = ''; $('prog').style.width = '0';
+  if (!z.playing) { $('phase').textContent = T.needTrack; return; }
+  if (!$('clickAudio').paused && !confirm(T.samePhone)) return;
+  const run = measuring = { cancel: false };
+  $('start').disabled = true; $('apply').disabled = true; $('cancel').hidden = false;
+  const off0 = z.offset_ms;
+  let sum;
+  try {
+    sum = summarise(await record(z, rounds, run));
+  } catch (e) {
+    $('phase').textContent = e instanceof Stop ? e.message : String(e);
+    return;
+  } finally {
+    measuring = null; $('start').disabled = false; $('cancel').hidden = true;
+    $('prog').style.width = '0';
+  }
   $('phase').textContent = '';
-  const good = r.qa > 4 && r.qd > 8;
-  const fits = good && Math.abs(r.delay) <= TOL_MS;
-  suggested = fits ? z.offset_ms : z.offset_ms - r.delay;
-  $('resBig').textContent = fits ? T.fits(r.delay) : (r.delay > 0 ? T.late(r.delay) : T.early(-r.delay));
-  $('resBig').className = 'big ' + (good ? 'ok' : 'warn');
-  $('resText').innerHTML = fits ? T.keep(suggested) : T.suggest(suggested);
-  $('resQual').textContent = T.qual(r.qa, r.qd) + (good ? '' : ' — ' + T.bad);
-  $('apply').textContent = fits ? T.confirm : T.apply;
-  $('apply').disabled = !good;
+  const best = sum.res.reduce((m, r) => (r.qd > m.qd ? r : m), sum.res[0]);
+  $('resQual').textContent = T.rounds(sum.list) + ' · ' + T.qual(best.qa, best.qd);
   $('result').hidden = false;
+  if (verifyPending) {
+    verifyPending = false;
+    if (!sum.ok) { $('resBig').textContent = sum.msg; $('resBig').className = 'big warn'; $('resText').innerHTML = ''; $('apply').disabled = true; return; }
+    const fits = Math.abs(sum.delay) <= TOL_MS;
+    $('resBig').textContent = T.verified(sum.delay) + (fits ? ' ✓' : '');
+    $('resBig').className = 'big ' + (fits ? 'ok' : 'warn');
+    suggested = fits ? null : off0 - sum.delay;
+    $('resText').innerHTML = fits ? T.keep(off0) : T.suggest(suggested);
+    $('apply').textContent = T.apply; $('apply').disabled = fits;
+    return;
+  }
+  if (!sum.ok) {
+    $('resBig').textContent = sum.msg; $('resBig').className = 'big warn';
+    $('resText').innerHTML = ''; $('apply').disabled = true; suggested = null;
+    return;
+  }
+  const fits = Math.abs(sum.delay) <= TOL_MS;
+  suggested = fits ? off0 : off0 - sum.delay;
+  $('resBig').textContent = fits ? T.fits(sum.delay) : (sum.delay > 0 ? T.late(sum.delay) : T.early(-sum.delay));
+  $('resBig').className = 'big ok';
+  $('resText').innerHTML = fits ? T.keep(suggested) : T.suggest(suggested);
+  $('apply').textContent = fits ? T.confirm : T.apply;
+  $('apply').disabled = false;
 }
 
 // ---------- Volume matching ----------
@@ -1087,24 +1240,54 @@ document.querySelectorAll('[data-trim]').forEach(b => b.onclick = async () => {
 });
 $('lvSave').onclick = async () => { const z = zone(); if (z) await setTrim(z.trim_db, true); };
 
+// Offset changes run one after the other (fast taps must not get lost)
+let opChain = Promise.resolve();
+function queued(fn) { opChain = opChain.then(fn).catch((e) => toast(String(e))); return opChain; }
 async function setOffset(value, save) {
   const z = zone(); if (!z) return null;
+  value = Math.max(-1000, Math.min(1000, Math.round(value)));
   const r = await api(`api/zones/${z.index}/offset`, { offset_ms: value, save });
-  const j = await r.json(); await refresh(); return j;
+  if (!r.ok) throw new Error(await r.text());
+  const j = await r.json();
+  if (save) await loadConfig();
+  await refresh();
+  return j;
 }
-$('start').onclick = measure;
-$('again').onclick = measure;
-$('apply').onclick = async () => {
+async function saveOffset(value) {
+  const j = await setOffset(value, true);
+  const msg = j && j.saved ? T.savedOk(j.offset_ms) : T.saveFailed;
+  $('earMsg').textContent = msg;
+  return j;
+}
+$('start').onclick = () => measure();
+$('again').onclick = () => measure();
+$('cancel').onclick = () => { if (measuring) measuring.cancel = true; };
+$('apply').onclick = () => queued(async () => {
   if (suggested === null) return;
   const keep = suggested === zone()?.offset_ms;
-  const j = await setOffset(Math.max(-1000, Math.min(1000, suggested)), true);
-  if (j) $('applied').textContent = keep ? T.confirmed(j.offset_ms, j.saved) : T.applied(j.offset_ms, j.saved);
-};
-document.querySelectorAll('[data-step]').forEach(b => b.onclick = async () => {
-  const z = zone(); if (!z) return;
-  await setOffset(Math.max(-1000, Math.min(1000, z.offset_ms + Number(b.dataset.step))), false);
+  const j = await saveOffset(suggested);
+  $('applied').textContent = j && j.saved ? T.savedOk(j.offset_ms) : T.saveFailed;
+  if (keep || !(j && j.saved)) return;
+  $('applied').textContent = T.verifying;
+  verifyPending = true;
+  await measure(2);
 });
-$('saveManual').onclick = async () => { const z = zone(); if (z) await setOffset(z.offset_ms, true); };
+document.querySelectorAll('[data-step]').forEach(b => b.onclick = () => queued(async () => {
+  const z = zone(); if (!z) return;
+  $('earMsg').textContent = '';
+  await setOffset(z.offset_ms + Number(b.dataset.step), false);
+}));
+$('saveManual').onclick = () => queued(async () => { const z = zone(); if (z) await saveOffset(z.offset_ms); });
+$('revert').onclick = () => queued(async () => {
+  const z = zone(); if (!z) return;
+  $('earMsg').textContent = '';
+  await setOffset(savedOffset(z), false);
+});
+$('useDefault').onclick = () => queued(async () => {
+  const v = Number($('useDefault').dataset.value);
+  $('earMsg').textContent = '';
+  await setOffset(v, false);
+});
 </script>
 </body>
 </html>

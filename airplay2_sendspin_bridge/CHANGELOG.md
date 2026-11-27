@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.0
+
+- **Stable timing:** the bridge used to anchor every AirPlay session on the
+  arrival of its very first audio chunk (part of shairport-sync's silent
+  lead-in burst) and only corrected errors above 60 ms – each session ended
+  up a random −30…+30 ms off, so calibration results jumped around. It now
+  follows the earliest arrivals over a sliding window (shairport-sync
+  releases packets 0–10 ms late, never early), ignores bursts, follows clock
+  drift by up to 1 ms/s and starts over after a pause or skip. In a
+  simulation all sessions agree within 1 ms. Check your offsets once.
+- **Calibration page reworked:** mode **By ear** (default) with
+  −20/−5/+5/+20 ms, a clear saved / not saved state, "back to the saved
+  value" and the model default; mode **With microphone** for a second
+  device: waits until the timing has locked, measures 3 rounds, refuses to
+  suggest anything when they disagree, verifies after saving, can be
+  cancelled.
+- Click track: 10 minutes without a loop (a loop restart made iOS flush
+  AirPlay mid-measurement).
+- Page and API show the timing state (`sync_locked`, `sync_error_ms`).
+
 ## 0.8.0
 
 - **Home Assistant integration "AirPlay Bridge" instead of MQTT**

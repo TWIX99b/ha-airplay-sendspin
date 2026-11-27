@@ -35,8 +35,9 @@ HomePod mini.
 - **Eigene Seite in HA** („AirPlay Bridge“): Lautsprecher als Kacheln mit
   Status, Titel und Cover; **Lautsprecher aus HA vorschlagen lassen**,
   bearbeiten, entfernen.
-- **Einmessen per Mikrofon:** Zeitversatz (±1–2 ms) und Lautstärke gegenüber
-  HomePod/Sonos, direkt im Browser.
+- **Stabiler Takt:** jede AirPlay-Sitzung rastet auf ±1 ms gleich ein.
+- **Einmessen** gegenüber HomePod/Sonos, direkt im Browser: nach Gehör mit
+  ±-Knöpfen oder per Mikrofon (3 Runden, Prüfmessung); Lautstärke angleichen.
 - **Lautstärke:** Echo spielt bei AirPlay auf eigener Lautstärke (pro
   Lautsprecher), **Nachtmodus** mit Zeitfenster; bei Sprachbefehlen kommt die
   Antwort in normaler Lautstärke.
@@ -103,8 +104,9 @@ HomePod mini.
   groupable with HomePod, Sonos & co., in sync.
 - **Own page in HA** ("AirPlay Bridge"): speakers as tiles with status, track
   and cover; **speakers suggested from HA**, edit, remove.
-- **Microphone calibration:** timing offset (±1–2 ms) and volume against a
-  HomePod/Sonos, right in the browser.
+- **Stable timing:** every AirPlay session locks onto the same timing (±1 ms).
+- **Calibration** against a HomePod/Sonos, right in the browser: by ear with
+  ± buttons or by microphone (3 rounds, verification); volume matching.
 - **Volume:** the Echo plays at its own AirPlay volume (per speaker),
   **night mode** with a time window; voice replies come at normal volume.
 - **Title and cover** on Echos with a screen (e.g. Echo Show 8).

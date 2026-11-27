@@ -46,6 +46,7 @@ from aiosendspin.noise.pairing import PairingAttempt
 from ha import SatelliteWatcher, find_device_info, find_satellite, ha_config
 from metadata import MetadataReader, TrackInfo
 from speakers import model_name
+from timebase import TimeBase
 from web import start_web
 
 try:  # the package may or may not re-export these
@@ -70,9 +71,6 @@ BYTES_PER_FRAME = CHANNELS * 2  # S16_LE
 CHUNK_FRAMES = 960  # 20 ms
 CHUNK_BYTES = CHUNK_FRAMES * BYTES_PER_FRAME
 CHUNK_US = CHUNK_FRAMES * 1_000_000 // SAMPLE_RATE
-HARD_RESYNC_US = 250_000  # jump (skip/seek) → resync immediately
-SOFT_RESYNC_US = 60_000  # lasting offset (smoothed) → resync
-EMA_ALPHA = 0.02  # smoothing of the timing error
 MIN_LEAD_US = 80_000  # anything due sooner is dropped
 MAX_BATCH = 5  # up to 100 ms per commit
 QUEUE_MAX = 1500  # 30 s buffer between reader and sender
@@ -480,7 +478,8 @@ class Zone:
         self.streaming = False
         self.cal_mute = False
         self.level_mode = False
-        self._force_resync = False
+        self.sync_locked = False  # time base settled and within ±2 ms
+        self.sync_error_ms = 0.0
         self._lvl_buf: list[bytes] = []
         self._lvl_silent = 0
         # Speaker volume while AirPlay plays (0 = leave it alone)
@@ -755,7 +754,6 @@ class Zone:
     def set_offset(self, offset_ms: int) -> None:
         """Change the fine offset immediately (takes effect at once)."""
         self.cfg.latency_offset_ms = int(offset_ms)
-        self._force_resync = True
         self.log.info("latency_offset_ms is now %+d ms", offset_ms)
         self._notify()
 
@@ -1012,108 +1010,108 @@ class Zone:
         self.active = active
         self.streaming = True
         self.stats["sessions"] += 1
-        dropping = False
         self._cover_sent = None
         asyncio.ensure_future(self._push_track(active))
         self._notify()
         clock = active[0].stream
-        next_ts: int | None = None
-        err_avg = 0.0
-        sent = resyncs = dropped = 0
+        tb = TimeBase(CHUNK_US)
+        pending: list[tuple[int, bytes]] = []  # waiting for the time base
+        sent = restarts = dropped = 0
+        late = False
         loop = asyncio.get_running_loop()
         last_report = loop.time()
         item: tuple[int, bytes] | None = first
         try:
             while item is not None and self.active:
-                # Gather what is already waiting (up to MAX_BATCH chunks)
-                arrival, pcm = item
-                parts = [pcm]
-                while len(parts) < MAX_BATCH and not queue.empty():
+                # Everything that is already waiting goes onto the time base
+                items = [item]
+                while not queue.empty() and len(items) < 50:
                     nxt = queue.get_nowait()
                     if nxt is None:
                         queue.put_nowait(None)
                         break
-                    parts.append(nxt[1])
+                    items.append(nxt)
+                for arrival, pcm in items:
+                    index, started_over = tb.add(arrival)
+                    if started_over:
+                        if tb.jumps > restarts:  # pause, skip or flush
+                            restarts = tb.jumps
+                            self.stats["resyncs"] += 1
+                            self.log.debug("time line starts over")
+                        pending = []
+                    pending.append((index, pcm))
+                self.sync_locked = tb.locked
+                self.sync_error_ms = tb.error_us / 1000
 
-                # Arrival time (monotonic) → Sendspin server clock
-                now_srv = clock.now_us()
-                target = arrival + (now_srv - mono_us()) + self._lead_us()
-                if self._force_resync:  # offset changed via the web UI
-                    self._force_resync = False
-                    next_ts = None
-
-                if target < now_srv + MIN_LEAD_US:
-                    # Arrived during the takeover and is already too late
-                    dropped += len(parts)
-                    if sent and not dropping:  # not the normal takeover gap
-                        self.stats["drops"] += 1
-                    dropping = True
-                    next_ts = None
-                elif next_ts is None:
-                    dropping = False
-                    next_ts = target
-                    err_avg = 0.0
-                    self.log.info(
-                        "First audio is sent, plays in %d ms",
-                        (target - now_srv) // 1000,
-                    )
-                else:
-                    err = target - next_ts
-                    err_avg += (err - err_avg) * EMA_ALPHA
-                    # Jitter of single chunks is ignored; resync only for real
-                    # jumps (skip, pause) or a lasting offset.
-                    if abs(err) > HARD_RESYNC_US or abs(err_avg) > SOFT_RESYNC_US:
-                        resyncs += 1
-                        self.stats["resyncs"] += 1
-                        self.log.debug(
-                            "resync: err=%+d µs avg=%+d µs", err, int(err_avg)
-                        )
-                        next_ts = target
-                        err_avg = 0.0
-
-                if next_ts is not None:
-                    if self.level_mode:  # volume matching (web UI)
-                        parts = [self._level_chunk(p) for p in parts]
-                    pcm = b"".join(parts)
-                    if self.cal_mute:  # calibration: silent, timing unchanged
-                        pcm = bytes(len(pcm))
-                    elif self.cfg.volume_trim_db < 0:
-                        pcm = apply_gain(pcm, 10 ** (self.cfg.volume_trim_db / 20))
-                    for link in list(self.active):
-                        try:
-                            link.stream.prepare_audio(
-                                self._pcm_for(link, pcm), PCM_FORMAT
+                if tb.settled and pending:
+                    now_srv = clock.now_us()
+                    shift = now_srv - mono_us() + self._lead_us()
+                    # Too late (takeover, stall): drop from the front
+                    k = 0
+                    while (
+                        k < len(pending)
+                        and tb.time_of(pending[k][0]) + shift < now_srv + MIN_LEAD_US
+                    ):
+                        k += 1
+                    if k:
+                        dropped += k
+                        if sent and not late:  # not the normal takeover gap
+                            self.stats["drops"] += 1
+                        late = True
+                    else:
+                        late = False
+                    ready, pending = pending[k:], []
+                    for j in range(0, len(ready), MAX_BATCH):
+                        batch = ready[j : j + MAX_BATCH]
+                        play_at = int(tb.time_of(batch[0][0]) + shift)
+                        parts = [p for _, p in batch]
+                        if self.level_mode:  # volume matching (web UI)
+                            parts = [self._level_chunk(p) for p in parts]
+                        pcm = b"".join(parts)
+                        if self.cal_mute:  # calibration: silent, timing unchanged
+                            pcm = bytes(len(pcm))
+                        elif self.cfg.volume_trim_db < 0:
+                            pcm = apply_gain(pcm, 10 ** (self.cfg.volume_trim_db / 20))
+                        for link in list(self.active):
+                            try:
+                                link.stream.prepare_audio(
+                                    self._pcm_for(link, pcm), PCM_FORMAT
+                                )
+                                await link.stream.commit_audio(play_start_us=play_at)
+                            except Exception as err:  # noqa: BLE001
+                                # one speaker of a pair gone: the other plays on
+                                self.log.error("[%s] lost: %s", link.cfg.label, err)
+                                self.active.remove(link)
+                                self.stats["lost"] += 1
+                                await self._release(link)
+                        if not sent:
+                            self.log.info(
+                                "First audio is sent, plays in %d ms",
+                                (play_at - now_srv) // 1000,
                             )
-                            await link.stream.commit_audio(play_start_us=next_ts)
-                        except Exception as err:  # noqa: BLE001
-                            # one speaker of a pair gone: the other plays on
-                            self.log.error("[%s] lost: %s", link.cfg.label, err)
-                            self.active.remove(link)
-                            self.stats["lost"] += 1
-                            await self._release(link)
-                    next_ts += CHUNK_US * len(parts)
-                    sent += len(parts)
-                    self.stats["audio_s"] += CHUNK_US * len(parts) / 1e6
+                        sent += len(batch)
+                        self.stats["audio_s"] += CHUNK_US * len(batch) / 1e6
 
                 if loop.time() - last_report >= 10:
                     self.log.info(
-                        "streaming: %.1f s audio, %d resyncs, %d dropped, "
-                        "avg offset %+.1f ms",
+                        "streaming: %.1f s audio, %d restarts, %d dropped, "
+                        "timing %+.1f ms (%s)",
                         sent * CHUNK_US / 1e6,
-                        resyncs,
+                        restarts,
                         dropped,
-                        err_avg / 1000,
+                        tb.error_us / 1000,
+                        "locked" if tb.locked else "settling",
                     )
                     last_report = loop.time()
                     self._follow_target()  # night mode starting/ending
                     self._notify()
-
                 item = await self._next(queue)
             self.log.info("AirPlay paused/ended → releasing the speaker(s)")
         except Exception as err:  # noqa: BLE001
             self.log.exception("Streaming error: %s", err)
         finally:
             self.streaming = False
+            self.sync_locked = False
             self.cal_mute = False
             self.set_level_mode(False)
             links, self.active = self.active, []

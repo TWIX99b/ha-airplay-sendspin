@@ -81,8 +81,12 @@ def analyse(x, sr, markA, markB, end):
 
 # real click waveform from the add-on
 with wave.open(io.BytesIO(web.build_click_wav())) as w:
-    src = np.frombuffer(w.readframes(48000), dtype="<i2").astype(float) / 32768
-click = src[: int(48000 * 0.004)]
+    _rate = w.getframerate()
+    src = np.frombuffer(w.readframes(_rate), dtype="<i2").astype(float) / 32768
+_src = src[: int(_rate * 0.006)]
+# as the phone plays it: resampled to 48 kHz
+_t = np.arange(int(48000 * 0.006)) / 48000
+click = np.interp(_t, np.arange(len(_src)) / _rate, _src)[: int(48000 * 0.004)]
 
 
 def room(click, sr, rng):
