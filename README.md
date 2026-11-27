@@ -2,6 +2,10 @@
 
 ![logo](airplay2_sendspin_bridge/logo.png)
 
+[![Test & build](https://github.com/TWIX99b/ha-airplay-sendspin/actions/workflows/build.yaml/badge.svg)](https://github.com/TWIX99b/ha-airplay-sendspin/actions/workflows/build.yaml)
+![Version](https://img.shields.io/badge/version-0.7.0-blue)
+![Arch](https://img.shields.io/badge/arch-amd64%20%7C%20aarch64-lightgrey)
+
 [🇩🇪 Deutsch](#deutsch) · [🇬🇧 English](#english)
 
 > 🤖 **Hinweis / Note:** Dieses Projekt wurde vollständig mit **Claude**
@@ -21,7 +25,28 @@ Macht Sendspin-Lautsprecher, z. B. Amazon Echos mit
 dann im AirPlay-Menü mit HomePods, Sonos und anderen AirPlay-2-Lautsprechern
 gruppieren und spielen synchron.
 
-**Status:** experimentell. Getestet mit Echo 2 und Sonos.
+**Status:** experimentell. Getestet mit Echo 2 zusammen mit Sonos Roam 2 und
+HomePod mini.
+
+### Funktionen
+
+- **AirPlay 2 für Echos:** jeder Lautsprecher erscheint auf iPhone, iPad und
+  Mac, gruppierbar mit HomePod, Sonos & Co., synchron.
+- **Eigene Seite in HA** („AirPlay Bridge“): Lautsprecher als Kacheln mit
+  Status, Titel und Cover; **Lautsprecher aus HA vorschlagen lassen**,
+  bearbeiten, entfernen.
+- **Einmessen per Mikrofon:** Zeitversatz (±1–2 ms) und Lautstärke gegenüber
+  HomePod/Sonos, direkt im Browser.
+- **Lautstärke:** Echo spielt bei AirPlay auf eigener Lautstärke (pro
+  Lautsprecher), **Nachtmodus** mit Zeitfenster; bei Sprachbefehlen kommt die
+  Antwort in normaler Lautstärke.
+- **Titel und Cover** auf Echos mit Bildschirm (z. B. Echo Show 8).
+- **Stereo-Paar:** zwei Echos als ein AirPlay-Lautsprecher, links/rechts.
+- **Test-Ton** und **Verbindungsqualität** pro Lautsprecher.
+- **Echtes Modell** in AirPlay („Echo 2“ von Amazon statt „ShairportSync“).
+- **HA-Entitäten über MQTT:** AirPlay aktiv, Titel, Feinabgleich,
+  Lautstärke-Anpassung, Aussetzer – auch mit externem Broker.
+- **Fertige Images** für amd64 und aarch64: Updates in Sekunden.
 
 ### Installation
 
@@ -30,8 +55,9 @@ gruppieren und spielen synchron.
 Oder: Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories →
 `https://github.com/TWIX99b/ha-airplay-sendspin`
 
-Konfiguration, **automatische Einmessung per Mikrofon** und Messwerte:
-siehe [DOCS.md](airplay2_sendspin_bridge/DOCS.md).
+Alles Weitere – Konfiguration, Einmessen, Messwerte-Tabelle – in der
+[DOCS.md](airplay2_sendspin_bridge/DOCS.md), Änderungen im
+[CHANGELOG](airplay2_sendspin_bridge/CHANGELOG.md).
 
 ### So funktioniert es
 
@@ -50,7 +76,9 @@ wieder Music Assistant zur Verfügung.
 - Home Assistant OS bzw. Supervised, **per Kabel** angeschlossen
 - eine freie IP im HA-Netz
 - Sendspin-Pairing-Token pro Lautsprecher (echo-dot-assist: Entität
-  „Sendspin pairing token“)
+  „Sendspin pairing token“ aktivieren)
+- fürs Einmessen: HA über **HTTPS** öffnen (Mikrofon im Browser)
+- optional: MQTT-Broker (Mosquitto-Add-on oder extern) für die Entitäten
 
 ---
 
@@ -61,7 +89,26 @@ Turns Sendspin speakers, e.g. Amazon Echos running
 **real AirPlay 2 receivers**. iOS and macOS can group them with HomePods,
 Sonos and other AirPlay 2 speakers, and they play in sync.
 
-**Status:** experimental. Tested with Echo 2 and Sonos.
+**Status:** experimental. Tested with Echo 2 together with Sonos Roam 2 and
+HomePod mini.
+
+### Features
+
+- **AirPlay 2 for Echos:** each speaker shows up on iPhone, iPad and Mac,
+  groupable with HomePod, Sonos & co., in sync.
+- **Own page in HA** ("AirPlay Bridge"): speakers as tiles with status, track
+  and cover; **speakers suggested from HA**, edit, remove.
+- **Microphone calibration:** timing offset (±1–2 ms) and volume against a
+  HomePod/Sonos, right in the browser.
+- **Volume:** the Echo plays at its own AirPlay volume (per speaker),
+  **night mode** with a time window; voice replies come at normal volume.
+- **Title and cover** on Echos with a screen (e.g. Echo Show 8).
+- **Stereo pair:** two Echos as one AirPlay speaker, left/right.
+- **Test tone** and **connection quality** per speaker.
+- **Real model** in AirPlay ("Echo 2" by Amazon instead of "ShairportSync").
+- **HA entities via MQTT:** AirPlay active, title, sync offset, volume trim,
+  dropouts – also with an external broker.
+- **Prebuilt images** for amd64 and aarch64: updates in seconds.
 
 ### Install
 
@@ -70,8 +117,9 @@ Sonos and other AirPlay 2 speakers, and they play in sync.
 Or: Settings → Add-ons → Add-on Store → ⋮ → Repositories →
 `https://github.com/TWIX99b/ha-airplay-sendspin`
 
-Configuration, **automatic microphone calibration** and measured values:
-see [DOCS.md](airplay2_sendspin_bridge/DOCS.md).
+Everything else – configuration, calibration, measured values – in
+[DOCS.md](airplay2_sendspin_bridge/DOCS.md), changes in the
+[CHANGELOG](airplay2_sendspin_bridge/CHANGELOG.md).
 
 ### How it works
 
@@ -88,8 +136,10 @@ afterwards.
 
 - Home Assistant OS or Supervised, **wired** network connection
 - a free IP in HA's network
-- a Sendspin pairing token for each speaker (echo-dot-assist: entity
-  "Sendspin pairing token")
+- a Sendspin pairing token for each speaker (echo-dot-assist: enable the
+  entity "Sendspin pairing token")
+- for calibration: open HA via **HTTPS** (microphone in the browser)
+- optional: an MQTT broker (Mosquitto add-on or external) for the entities
 
 ---
 
