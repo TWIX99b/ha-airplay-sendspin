@@ -1,5 +1,5 @@
 name: AirPlay 2 → Sendspin Bridge
-version: "0.7.0"
+version: "0.8.0"
 slug: airplay2_sendspin_bridge
 description: >-
   Turns Sendspin speakers (e.g. Echos with echo-dot-assist) into real AirPlay 2
@@ -18,8 +18,8 @@ privileged:
   - NET_ADMIN
   - SYS_ADMIN
 homeassistant_api: true
-services:
-  - mqtt:want
+discovery:
+  - airplay_bridge
 hassio_api: true
 ingress: true
 ingress_port: 8099
@@ -38,12 +38,6 @@ options:
   lower_volume_during_voice: true
   report_model: true
   metadata: true
-  mqtt: true
-  mqtt_host: ""
-  mqtt_port: 1883
-  mqtt_username: ""
-  mqtt_password: ""
-  mqtt_tls: false
   log_level: info
   zones: []
 schema:
@@ -59,12 +53,6 @@ schema:
   lower_volume_during_voice: bool
   report_model: bool
   metadata: bool
-  mqtt: bool
-  mqtt_host: str?
-  mqtt_port: port
-  mqtt_username: str?
-  mqtt_password: password?
-  mqtt_tls: bool
   log_level: list(debug|info|warning|error)
   zones:
     - name: str
@@ -86,3 +74,4 @@ schema:
       night_volume: int(0,100)?
       night_start: str?
       night_end: str?
+      night_enabled: bool?

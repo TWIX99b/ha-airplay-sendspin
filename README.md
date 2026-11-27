@@ -44,8 +44,9 @@ HomePod mini.
 - **Stereo-Paar:** zwei Echos als ein AirPlay-Lautsprecher, links/rechts.
 - **Test-Ton** und **Verbindungsqualität** pro Lautsprecher.
 - **Echtes Modell** in AirPlay („Echo 2“ von Amazon statt „ShairportSync“).
-- **HA-Entitäten über MQTT:** AirPlay aktiv, Titel, Feinabgleich,
-  Lautstärke-Anpassung, Aussetzer – auch mit externem Broker.
+- **Eigene HA-Integration** (ohne MQTT): AirPlay aktiv, Titel, Cover,
+  Lautstärke, Nachtmodus, Test-Ton, Feinabgleich, Aussetzer – direkt am
+  Gerät des Echos, live aktualisiert, wird automatisch gefunden.
 - **Fertige Images** für amd64 und aarch64: Updates in Sekunden.
 
 ### Installation
@@ -54,6 +55,11 @@ HomePod mini.
 
 Oder: Einstellungen → Add-ons → Add-on-Store → ⋮ → Repositories →
 `https://github.com/TWIX99b/ha-airplay-sendspin`
+
+**Integration (Entitäten):** Einstellungen → Marktplatz → ⋮ → Eigene
+Repositories → dieselbe Adresse, Typ **Integration** → „AirPlay Bridge“
+installieren, HA neu starten. Danach erscheint „AirPlay Bridge gefunden“
+unter Geräte & Dienste.
 
 Alles Weitere – Konfiguration, Einmessen, Messwerte-Tabelle – in der
 [DOCS.md](airplay2_sendspin_bridge/DOCS.md), Änderungen im
@@ -78,7 +84,6 @@ wieder Music Assistant zur Verfügung.
 - Sendspin-Pairing-Token pro Lautsprecher (echo-dot-assist: Entität
   „Sendspin pairing token“ aktivieren)
 - fürs Einmessen: HA über **HTTPS** öffnen (Mikrofon im Browser)
-- optional: MQTT-Broker (Mosquitto-Add-on oder extern) für die Entitäten
 
 ---
 
@@ -106,8 +111,9 @@ HomePod mini.
 - **Stereo pair:** two Echos as one AirPlay speaker, left/right.
 - **Test tone** and **connection quality** per speaker.
 - **Real model** in AirPlay ("Echo 2" by Amazon instead of "ShairportSync").
-- **HA entities via MQTT:** AirPlay active, title, sync offset, volume trim,
-  dropouts – also with an external broker.
+- **Own HA integration** (no MQTT): AirPlay active, title, cover, volume,
+  night mode, test tone, sync offset, dropouts – on the Echo's own device,
+  live updates, discovered automatically.
 - **Prebuilt images** for amd64 and aarch64: updates in seconds.
 
 ### Install
@@ -116,6 +122,11 @@ HomePod mini.
 
 Or: Settings → Add-ons → Add-on Store → ⋮ → Repositories →
 `https://github.com/TWIX99b/ha-airplay-sendspin`
+
+**Integration (entities):** Settings → Marketplace → ⋮ → Custom
+repositories → same address, type **Integration** → install "AirPlay
+Bridge", restart HA. "AirPlay Bridge discovered" then shows up under
+Devices & services.
 
 Everything else – configuration, calibration, measured values – in
 [DOCS.md](airplay2_sendspin_bridge/DOCS.md), changes in the
@@ -139,7 +150,6 @@ afterwards.
 - a Sendspin pairing token for each speaker (echo-dot-assist: enable the
   entity "Sendspin pairing token")
 - for calibration: open HA via **HTTPS** (microphone in the browser)
-- optional: an MQTT broker (Mosquitto add-on or external) for the entities
 
 ---
 

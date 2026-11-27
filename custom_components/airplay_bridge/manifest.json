@@ -1,0 +1,17 @@
+{
+  "domain": "airplay_bridge",
+  "name": "AirPlay Bridge",
+  "after_dependencies": [
+    "hassio"
+  ],
+  "codeowners": [
+    "@TWIX99b"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/TWIX99b/ha-airplay-sendspin",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/TWIX99b/ha-airplay-sendspin/issues",
+  "requirements": [],
+  "version": "0.8.0"
+}

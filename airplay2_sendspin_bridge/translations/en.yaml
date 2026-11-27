@@ -49,24 +49,6 @@ configuration:
     description: >-
       Title, artist, album and cover from AirPlay to the speaker (models with a
       screen) and to Home Assistant.
-  mqtt:
-    name: Entities via MQTT
-    description: >-
-      One device per speaker in HA: AirPlay active, title, sync offset and
-      volume trim. Needs an MQTT broker (e.g. Mosquitto).
-  mqtt_host:
-    name: MQTT broker (external)
-    description: >-
-      IP or name of your own broker, e.g. Mosquitto in an LXC. Empty = use the
-      broker from Home Assistant (Mosquitto add-on).
-  mqtt_port:
-    name: MQTT port
-  mqtt_username:
-    name: MQTT user
-  mqtt_password:
-    name: MQTT password
-  mqtt_tls:
-    name: MQTT over TLS
   log_level:
     name: Log level
   zones:

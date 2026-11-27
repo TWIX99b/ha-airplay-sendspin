@@ -45,9 +45,8 @@ from aiosendspin.noise import (
 from aiosendspin.noise.pairing import PairingAttempt
 from ha import SatelliteWatcher, find_device_info, find_satellite, ha_config
 from metadata import MetadataReader, TrackInfo
-from mqtt_ha import MqttBridge, broker_from_options
 from speakers import model_name
-from web import save_zone_option, start_web
+from web import start_web
 
 try:  # the package may or may not re-export these
     from aiosendspin.server import SendspinServer
@@ -130,6 +129,7 @@ class ZoneConfig:
     night_volume: int | None = None  # None = no night mode
     night_start: str = "22:00"
     night_end: str = "07:00"
+    night_enabled: bool = True  # switch in HA; keeps the times and volume
 
     @property
     def host(self) -> str:
@@ -139,6 +139,15 @@ class ZoneConfig:
     def slug(self) -> str:
         safe = "".join(c if c.isalnum() else "-" for c in self.name.lower())
         return f"z{self.index}-{safe.strip('-') or 'zone'}"
+
+    @property
+    def key(self) -> str:
+        """Stable id for Home Assistant (from the name, not the position)."""
+        name = self.name.lower()
+        for umlaut, plain in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
+            name = name.replace(umlaut, plain)
+        safe = "".join(c if c.isascii() and c.isalnum() else "_" for c in name)
+        return "_".join(p for p in safe.split("_") if p) or f"speaker_{self.index}"
 
 
 # --------------------------------------------------------------------------
@@ -480,7 +489,7 @@ class Zone:
         self.model = ""  # reported to AirPlay (icon), e.g. "Echo 2"
         self.manufacturer = ""
         self._session_lock = asyncio.Lock()
-        # Connection quality since the add-on started (tile, MQTT)
+        # Connection quality since the add-on started (tile, integration)
         self.stats = {
             "sessions": 0,
             "audio_s": 0.0,
@@ -495,7 +504,7 @@ class Zone:
         self._cover_sent: bytes | None = None
         self._listeners: list[Callable[[Zone], None]] = []
 
-    # --- listeners (MQTT) ----------------------------------------------------
+    # --- listeners (web UI, integration) ---------------------------------
     def add_listener(self, callback: Callable[[Zone], None]) -> None:
         self._listeners.append(callback)
 
@@ -551,7 +560,7 @@ class Zone:
         return self.default_volume
 
     def night_active(self, now_min: int | None = None) -> bool:
-        if self.cfg.night_volume is None:
+        if self.cfg.night_volume is None or not self.cfg.night_enabled:
             return False
         if now_min is None:
             t = time.localtime()
@@ -581,6 +590,7 @@ class Zone:
         self.cfg.night_volume = z.get("night_volume")
         self.cfg.night_start = z.get("night_start") or "22:00"
         self.cfg.night_end = z.get("night_end") or "07:00"
+        self.cfg.night_enabled = bool(z.get("night_enabled", True))
         self._follow_target()
         self._notify()
 
@@ -1154,6 +1164,7 @@ def zone_config(index: int, z: dict) -> ZoneConfig:
         night_volume=_opt_int(z.get("night_volume")),
         night_start=z.get("night_start") or "22:00",
         night_end=z.get("night_end") or "07:00",
+        night_enabled=bool(z.get("night_enabled", True)),
     )
 
 
@@ -1186,7 +1197,7 @@ async def main() -> None:
     for sig in (signal.SIGTERM, signal.SIGINT):
         loop.add_signal_handler(sig, stop.set)
 
-    # HA's time zone (night mode) and language (entity names)
+    # HA's time zone (night mode)
     ha_cfg = await ha_config()
     if ha_cfg.get("time_zone"):
         os.environ["TZ"] = ha_cfg["time_zone"]
@@ -1213,24 +1224,7 @@ async def main() -> None:
     tasks = [asyncio.create_task(z.run(), name=z.cfg.slug) for z in zones]
     web_runner = await start_web(zones)
 
-    mqtt = None
-    if opts.get("mqtt", True):
-        mqtt = MqttBridge(
-            zones,
-            save_zone_option,
-            os.environ.get("ADDON_VERSION", "dev"),
-            str(ha_cfg.get("language") or "en").split("-")[0],
-            broker_from_options(opts),
-        )
-        try:
-            await mqtt.start()
-        except Exception as err:  # noqa: BLE001
-            log.warning("MQTT not started: %s", err)
-            mqtt = None
-
     await stop.wait()
-    if mqtt is not None:
-        mqtt.stop()
     await web_runner.cleanup()
     for t in tasks + background:
         t.cancel()

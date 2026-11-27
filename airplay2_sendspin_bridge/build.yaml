@@ -5,4 +5,3 @@ args:
   SPS_VERSION: "5.6.2"
   NQPTP_REF: development
   AIOSENDSPIN_SPEC: "aiosendspin[server]==11.0.0"
-  PAHO_SPEC: "paho-mqtt==2.1.0"

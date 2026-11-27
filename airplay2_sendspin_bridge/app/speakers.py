@@ -140,6 +140,8 @@ def clean_zone(raw: dict, old: dict | None) -> dict:
         if not 0 <= value <= 100:
             raise ValueError(f"{name}: {key} must be within 0 … 100 %")
         zone[key] = value
+    if raw.get("night_enabled") is not None and not raw.get("night_enabled"):
+        zone["night_enabled"] = False  # night mode switched off in HA
     if "night_volume" in zone:
         for key, default in (("night_start", "22:00"), ("night_end", "07:00")):
             value = _text(raw, key) or default

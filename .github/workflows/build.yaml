@@ -6,7 +6,7 @@ name: Test & build
 
 on:
   push:
-    branches: [main]
+    branches: [main, "dev-*"]
   pull_request:
   workflow_dispatch:
 
@@ -34,13 +34,22 @@ jobs:
           node-version: "22"
 
       - name: Install tools
-        run: pip install "ruff==0.16.9" numpy pyyaml
+        run: pip install "ruff==0.16.9" numpy pyyaml aiohttp
 
       - name: Lint
         run: |
           ruff check --select F,E,W,B,UP,SIM,I --target-version py312 "$ADDON_DIR/app"
           ruff format --check "$ADDON_DIR/app"
           ruff check --select F,E9 tests
+          ruff check --select F,E,W,B,UP,SIM,I --target-version py313 custom_components
+          ruff format --check custom_components
+
+      - name: Same version in add-on and integration
+        run: |
+          addon=$(sed -nE 's/^version: *"?([^"]+)"?.*/\1/p' "$ADDON_DIR/config.yaml")
+          integration=$(python -c "import json;print(json.load(open('custom_components/airplay_bridge/manifest.json'))['version'])")
+          echo "add-on $addon, integration $integration"
+          test "$addon" = "$integration"
 
       - name: YAML
         run: |
@@ -70,10 +79,45 @@ jobs:
           python tests/test_calibration.py
           python tests/test_volume_matching.py
           python tests/test_features.py
+          python tests/test_addon_api.py
+
+  integration:
+    name: Integration in Home Assistant
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Home Assistant test harness
+        run: pip install pytest-homeassistant-custom-component
+
+      - name: Tests against a fake add-on
+        run: python -m pytest -v
+
+  hassfest:
+    name: hassfest (manifest, translations)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: home-assistant/actions/hassfest@master
+
+  marketplace:
+    name: Marketplace (HACS) validation
+    runs-on: ubuntu-24.04
+    continue-on-error: true  # repo topics/description are set on GitHub by hand
+    steps:
+      - uses: actions/checkout@v6
+      - uses: hacs/action@main
+        with:
+          category: integration
+          ignore: brands topics description
 
   init:
     name: Prepare build
-    needs: test
+    needs: [test, integration]
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
@@ -132,3 +176,23 @@ jobs:
           skip-existing: ${{ needs.init.outputs.version }}
           version: ${{ needs.init.outputs.version }}
           cosign: "false"
+
+  release:
+    name: GitHub release (Marketplace update)
+    needs: [init, build]
+    if: needs.init.outputs.push == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Create release for a new version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.init.outputs.version }}
+        run: |
+          if gh release view "v$VERSION" >/dev/null 2>&1; then
+            echo "v$VERSION exists"; exit 0
+          fi
+          notes=$(awk "/^## $VERSION\$/{f=1;next} /^## /{f=0} f" "$ADDON_DIR/CHANGELOG.md")
+          gh release create "v$VERSION" --title "$VERSION" --notes "$notes" --target "$GITHUB_SHA"

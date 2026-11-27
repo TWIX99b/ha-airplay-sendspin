@@ -4,7 +4,6 @@ FROM ${BUILD_FROM}
 ARG SPS_VERSION=5.6.2
 ARG NQPTP_REF=development
 ARG AIOSENDSPIN_SPEC="aiosendspin[server]==11.0.0"
-ARG PAHO_SPEC="paho-mqtt==2.1.0"
 ARG BUILD_VERSION=dev
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -52,7 +51,7 @@ RUN git clone --depth 1 --branch "${SPS_VERSION}" \
 # Python bridge (aiosendspin needs Python >= 3.12; Debian trixie ships 3.13)
 RUN python3 -m venv /opt/venv \
  && /opt/venv/bin/pip install --upgrade pip \
- && /opt/venv/bin/pip install "${AIOSENDSPIN_SPEC}" "${PAHO_SPEC}"
+ && /opt/venv/bin/pip install "${AIOSENDSPIN_SPEC}"
 
 ENV ADDON_VERSION=${BUILD_VERSION}
 
