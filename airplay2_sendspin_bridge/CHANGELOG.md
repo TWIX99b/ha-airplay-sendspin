@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.0
+
+- **Home Assistant integration "AirPlay Bridge" instead of MQTT**
+  (`custom_components/airplay_bridge`, install via the Marketplace/HACS).
+  The add-on announces itself (Supervisor discovery) – confirm once, no
+  broker needed. Entities sit on the **Echo's own device**: AirPlay, title,
+  cover (image), AirPlay volume, night mode (switch), test tone (button),
+  offset, volume trim, dropouts. Live updates over a WebSocket.
+- Add-on: token-protected API `/int/` for the integration; settings changed
+  in HA are validated, saved and applied live.
+- Night mode can be switched off without losing its times (`night_enabled`).
+- Stable entity ids from the speaker name (umlauts transliterated).
+- **Removed:** MQTT (options `mqtt*`, paho-mqtt). Delete the old "… AirPlay"
+  MQTT devices in HA.
+- CI: integration tested in a real Home Assistant against a fake add-on,
+  hassfest, Marketplace validation, GitHub release per version.
+
 ## 0.7.0
 
 - **Real model in AirPlay:** shairport-sync is patched at build time so each

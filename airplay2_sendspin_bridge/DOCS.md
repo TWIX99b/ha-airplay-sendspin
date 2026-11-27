@@ -112,8 +112,6 @@ zones:
 | `zones[].volume_trim_db` | Lautstärke-Anpassung pro Lautsprecher, 0 bis −30 dB. Wird per Einmessung gesetzt. |
 | `lower_volume_during_voice` | Solange der Sprachassistent des Lautsprechers zuhört oder antwortet, bekommt er seine alte Lautstärke zurück (Standard an). |
 | `metadata` | Titel, Interpret, Album und Cover weitergeben (Standard an). |
-| `mqtt` | Entitäten in HA über MQTT (Standard an, braucht einen Broker). |
-| `mqtt_host`, `mqtt_port`, `mqtt_username`, `mqtt_password`, `mqtt_tls` | Eigener (externer) Broker, z. B. Mosquitto im LXC. `mqtt_host` leer = Broker aus HA (Mosquitto-Add-on). |
 | `zones[].satellite_entity` | Sprachassistent des Lautsprechers (`assist_satellite.*`). Leer = automatisch über `token_entity`. |
 | `zones[].partner_host` usw. | Zweiter Lautsprecher als Stereo-Paar, siehe unten. |
 | `report_model` | Meldet AirPlay das echte Modell und den Hersteller (z. B. „Echo 2“ von Amazon) statt „ShairportSync“ (Standard an). |
@@ -208,12 +206,40 @@ zones:
 Beide bekommen dieselbe Spielzeit, der Feinabgleich gilt für beide. Fällt
 einer aus, spielt der andere weiter.
 
-**Entitäten in HA (MQTT):** Mit einem MQTT-Broker (z. B. Mosquitto)
-erscheint pro Lautsprecher ein Gerät „<Name> AirPlay“ mit:
-- **AirPlay**: spielt gerade über AirPlay (an/aus), z. B. für Automationen
-- **Titel**: aktueller Titel, Interpret und Album als Attribute
-- **Feinabgleich** und **Lautstärke-Anpassung**: änderbar, wirken sofort
-  und werden gespeichert
+**Entitäten in HA:** über die Integration „AirPlay Bridge“, siehe unten.
+
+### Integration „AirPlay Bridge“ (Entitäten in HA)
+
+Seit 0.8 gibt es statt MQTT eine eigene Integration. Sie hängt die
+AirPlay-Entitäten **direkt an das Gerät des Echos** (z. B. „OG Stube
+Satellit“), gleich neben Sprachassistent und Media Player:
+
+| Entität | Was |
+|---|---|
+| AirPlay | an, solange über AirPlay gespielt wird |
+| AirPlay-Titel | Titel, Interpret und Album als Attribute |
+| AirPlay-Cover | Cover des laufenden Titels (Bild) |
+| AirPlay-Lautstärke | Lautstärke des Echos bei AirPlay (%), sofort wirksam |
+| AirPlay-Nachtmodus | Nachtmodus an/aus (Zeiten und Wert auf der Add-on-Seite) |
+| AirPlay-Test-Ton | Knopf: kurzer Ton auf dem Echo |
+| AirPlay-Versatz, AirPlay-Lautstärke-Anpassung | Einstellungen, sofort wirksam und gespeichert |
+| AirPlay-Aussetzer | Diagnose: Aussetzer seit dem Start des Add-ons |
+
+**Einrichten:**
+1. Einstellungen → **Marktplatz** (bis HA 2026.10: HACS) → ⋮ → Eigene
+   Repositories → `https://github.com/TWIX99b/ha-airplay-sendspin`, Typ
+   **Integration** → „AirPlay Bridge“ installieren, HA neu starten.
+2. Das Add-on meldet sich selbst: Unter Einstellungen → Geräte & Dienste
+   erscheint **„AirPlay Bridge gefunden“** → Konfigurieren → Absenden.
+3. Von Hand (falls nichts erscheint): Integration hinzufügen → „AirPlay
+   Bridge“ → Adresse `127.0.0.1`, Port `8099`, Token aus `/data/integration_token`
+   bzw. aus dem Add-on-Log.
+
+Die Werte kommen live: Das Add-on meldet jede Änderung sofort, ohne
+Abfrage-Intervall. Ein MQTT-Broker ist nicht mehr nötig.
+
+**Umstieg von 0.7 (MQTT):** Die alten Geräte „… AirPlay“ unter Einstellungen
+→ MQTT → Geräte löschen; Automationen auf die neuen Entitäten umstellen.
 
 ### Symbol, Test-Ton, Verbindung, Nachtmodus
 
@@ -234,7 +260,7 @@ Echos bleibt dabei unverändert.
 **Verbindung:** Die Kachel zeigt, wie oft es seit dem Start des Add-ons
 gehakt hat (Nachsynchronisierung, Lücke, verlorener Lautsprecher) und wie
 viel Musik lief: gut unter 1 Aussetzer pro Stunde, mäßig unter 4, sonst
-schlecht. Als MQTT-Sensor „Aussetzer“ auch in HA.
+schlecht. Als Sensor „AirPlay-Aussetzer“ auch in HA.
 
 **Lautstärke pro Lautsprecher und Nachtmodus:** Im Bearbeiten-Dialog eigene
 AirPlay-Lautstärke pro Echo und ein Nachtmodus, z. B. höchstens 40 % von
@@ -352,8 +378,6 @@ edited there by hand.
 | `zones[].volume_trim_db` | Per-speaker volume trim, 0 to −30 dB. Set by the calibration. |
 | `lower_volume_during_voice` | While the speaker's voice assistant listens or answers, it gets its old volume back (default on). |
 | `metadata` | Pass on title, artist, album and cover (default on). |
-| `mqtt` | Entities in HA via MQTT (default on, needs a broker). |
-| `mqtt_host`, `mqtt_port`, `mqtt_username`, `mqtt_password`, `mqtt_tls` | Your own (external) broker, e.g. Mosquitto in an LXC. Empty `mqtt_host` = broker from HA (Mosquitto add-on). |
 | `zones[].satellite_entity` | The speaker's voice assistant (`assist_satellite.*`). Empty = found via `token_entity`. |
 | `zones[].partner_host` etc. | Second speaker as a stereo pair, see below. |
 | `report_model` | Tells AirPlay the real model and manufacturer (e.g. "Echo 2" by Amazon) instead of "ShairportSync" (default on). |
@@ -444,12 +468,40 @@ zones:
 Both get the same play time; the fine offset applies to both. If one fails,
 the other plays on.
 
-**Entities in HA (MQTT):** With an MQTT broker (e.g. Mosquitto) each speaker
-gets a device "<name> AirPlay" with:
-- **AirPlay**: currently playing via AirPlay (on/off), e.g. for automations
-- **Now playing**: current title, artist and album as attributes
-- **Sync offset** and **Volume trim**: editable, take effect immediately and
-  are saved
+**Entities in HA:** via the "AirPlay Bridge" integration, see below.
+
+### Integration "AirPlay Bridge" (entities in HA)
+
+Since 0.8 there is an integration of its own instead of MQTT. It puts the
+AirPlay entities **straight on the Echo's device** (e.g. "Living room
+satellite"), next to the voice assistant and media player:
+
+| Entity | What |
+|---|---|
+| AirPlay | on while playing via AirPlay |
+| AirPlay title | title, artist and album as attributes |
+| AirPlay cover | cover of the current track (image) |
+| AirPlay volume | the Echo's volume during AirPlay (%), immediate |
+| AirPlay night mode | night mode on/off (times and value on the add-on page) |
+| AirPlay test tone | button: short tone on the Echo |
+| AirPlay sync offset, AirPlay volume trim | settings, immediate and saved |
+| AirPlay dropouts | diagnostic: dropouts since the add-on started |
+
+**Setup:**
+1. Settings → **Marketplace** (up to HA 2026.10: HACS) → ⋮ → Custom
+   repositories → `https://github.com/TWIX99b/ha-airplay-sendspin`, type
+   **Integration** → install "AirPlay Bridge", restart HA.
+2. The add-on announces itself: Settings → Devices & services shows
+   **"AirPlay Bridge discovered"** → Configure → Submit.
+3. By hand (if nothing shows up): Add integration → "AirPlay Bridge" →
+   host `127.0.0.1`, port `8099`, token from `/data/integration_token` or the
+   add-on log.
+
+Values arrive live: the add-on reports every change at once, no polling.
+An MQTT broker is no longer needed.
+
+**Moving from 0.7 (MQTT):** delete the old "… AirPlay" devices under
+Settings → MQTT → Devices; switch automations to the new entities.
 
 ### Icon, test tone, connection, night mode
 
@@ -467,8 +519,8 @@ A stereo pair plays it left first, then right. The Echo's volume stays as is.
 
 **Connection:** The tile shows how often it hiccupped since the add-on
 started (resync, gap, lost speaker) and how much music played: good below 1
-dropout per hour, fair below 4, otherwise poor. Also as MQTT sensor
-"Dropouts" in HA.
+dropout per hour, fair below 4, otherwise poor. Also as sensor "AirPlay
+dropouts" in HA.
 
 **Per-speaker volume and night mode:** In the edit dialog, an AirPlay volume
 per Echo and a night mode, e.g. at most 40 % from 22:00 to 07:00. If night

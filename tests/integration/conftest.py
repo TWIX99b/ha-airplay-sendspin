@@ -137,7 +137,9 @@ class FakeAddon:
 
 
 @pytest.fixture
-async def addon():
+async def addon(socket_enabled):
+    # The fake add-on is a real local server (127.0.0.1 only), so this
+    # fixture lifts Home Assistant's socket block for these tests.
     fake = FakeAddon()
     await fake.start()
     yield fake
