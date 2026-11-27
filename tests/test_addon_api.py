@@ -181,6 +181,26 @@ async def main():
         # the web page keeps working as before (local/ingress, no token)
         r = await client.get("/api/config")
         check(r.status == 200, "web page API unchanged")
+        # enabling a token entity: only Sendspin pairing-token sensors
+        enabled = []
+
+        async def fake_enable(entity_id):
+            enabled.append(entity_id)
+            return {"reload_delay": 30}
+
+        web.enable_entity = fake_enable
+        r = await client.post("/api/enable_token", json={"entity_id": "light.kitchen"})
+        check(r.status == 400 and not enabled, "enable: other entities refused")
+        r = await client.post(
+            "/api/enable_token",
+            json={"entity_id": "sensor.bad_sendspin_pairing_token"},
+        )
+        data = await r.json()
+        check(
+            r.status == 200 and enabled == ["sensor.bad_sendspin_pairing_token"]
+            and data["reload_delay"] == 30,
+            "enable: token entity enabled",
+        )
     print("ALL OK" if not FAILS else f"{len(FAILS)} FAILED")
     sys.exit(1 if FAILS else 0)
 

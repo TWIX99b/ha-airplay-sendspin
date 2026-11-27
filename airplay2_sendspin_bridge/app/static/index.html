@@ -55,6 +55,7 @@
   .big { font-size:1.5rem; font-weight:650; margin:6px 0; }
   .muted { color:var(--muted); font-size:.9rem; }
   .ok { color:var(--ok); } .warn { color:var(--warn); }
+  .ipwarn { border-color:var(--warn); border-width:2px; }
   .row { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
   code { background:var(--soft); padding:1px 6px; border-radius:6px; }
   a { color:var(--acc); }
@@ -126,6 +127,8 @@
     <button id="tabBtnSpk" class="active" data-t="tabSpk"></button>
     <button id="tabBtnCal" data-t="tabCal"></button>
   </div>
+
+  <div class="card ipwarn" id="ipWarn" hidden></div>
 
   <section id="tabSpk">
     <div class="grid" id="tiles"></div>
@@ -365,8 +368,14 @@ const T = DE ? {
   addTitle: 'Lautsprecher hinzufügen',
   addHint: 'Diese Geräte hat Home Assistant gefunden. Antippen zum Übernehmen:',
   addManual: 'Von Hand eintragen', cancel: 'Abbrechen',
-  noneFound: 'Keine Echos mit echo-dot-assist gefunden. Die Entität „Sendspin pairing token“ muss aktiviert sein.',
-  already: 'schon eingerichtet', noToken: 'Token-Entität deaktiviert',
+  noneFound: 'Keine Echos mit echo-dot-assist in Home Assistant gefunden.',
+  already: 'schon eingerichtet', noToken: 'Token noch leer – ist der Echo erreichbar?',
+  ipTitle: 'IP-Adresse für AirPlay ist nicht frei',
+  ipHost: (ip) => `${ip} ist eine Adresse des HA-Hosts selbst. Trag unter Konfiguration → ap2_ip eine freie IP ein und starte das Add-on neu.`,
+  ipUsed: (ip, mac) => `Auf ${ip} hat beim Start schon ein anderes Gerät geantwortet (MAC ${mac}). AirPlay funktioniert so nicht zuverlässig. Trag unter Konfiguration → ap2_ip eine freie IP ein und starte das Add-on neu.`,
+  tokDisabled: 'Token-Entität ist in HA deaktiviert', enable: 'Aktivieren', enabling: 'Aktiviere …',
+  enabled: 'Aktiviert. Home Assistant lädt den Echo neu – er erscheint hier in etwa 30 Sekunden.',
+  enableFail: 'Aktivieren hat nicht geklappt: ',
   editTitle: 'Lautsprecher bearbeiten', newTitle: 'Neuer Lautsprecher',
   fName: 'Name in AirPlay', fNameHint: 'So erscheint der Lautsprecher auf iPhone, iPad und Mac.',
   fDevice: 'Echo', manualDevice: '– von Hand –',
@@ -481,8 +490,14 @@ const T = DE ? {
   addTitle: 'Add speaker',
   addHint: 'Home Assistant found these devices. Tap one to use it:',
   addManual: 'Enter manually', cancel: 'Cancel',
-  noneFound: 'No Echos with echo-dot-assist found. The entity "Sendspin pairing token" must be enabled.',
-  already: 'already set up', noToken: 'token entity disabled',
+  noneFound: 'No Echos with echo-dot-assist found in Home Assistant.',
+  already: 'already set up', noToken: 'token still empty – is the Echo online?',
+  ipTitle: 'The AirPlay IP address is not free',
+  ipHost: (ip) => `${ip} is an address of the HA host itself. Enter a free IP under Configuration → ap2_ip and restart the add-on.`,
+  ipUsed: (ip, mac) => `Another device answered on ${ip} at start (MAC ${mac}). AirPlay will not work reliably. Enter a free IP under Configuration → ap2_ip and restart the add-on.`,
+  tokDisabled: 'token entity is disabled in HA', enable: 'Enable', enabling: 'Enabling …',
+  enabled: 'Enabled. Home Assistant reloads the Echo – it shows up here in about 30 seconds.',
+  enableFail: 'Enabling failed: ',
   editTitle: 'Edit speaker', newTitle: 'New speaker',
   fName: 'Name in AirPlay', fNameHint: 'This is how the speaker shows up on iPhone, iPad and Mac.',
   fDevice: 'Echo', manualDevice: '– manual –',
@@ -675,7 +690,12 @@ $('tabBtnCal').onclick = () => showTab('cal');
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
 
 async function loadConfig() {
-  try { const j = await (await fetch('api/config')).json(); cfg = j.zones || []; boot = j.boot; } catch (e) { /* keep */ }
+  try {
+    const j = await (await fetch('api/config')).json(); cfg = j.zones || []; boot = j.boot;
+    const c = j.ip_conflict;
+    $('ipWarn').hidden = !c;
+    if (c) $('ipWarn').innerHTML = `<b class="warn">⚠ ${esc(T.ipTitle)}</b><p>${esc(c.by === 'host' ? T.ipHost(c.ip) : T.ipUsed(c.ip, c.by))}</p>`;
+  } catch (e) { /* keep */ }
 }
 async function loadFound() {
   try { const r = await fetch('api/discover'); found = r.ok ? await r.json() : []; } catch (e) { found = []; }
@@ -745,18 +765,39 @@ async function openAdd() {
   $('suggList').innerHTML = '<div class="spin"></div>';
   $('dlgAdd').showModal();
   await loadFound();
+  renderFound();
+}
+function renderFound(msg) {
   if (!found.length) { $('suggList').innerHTML = `<p class="muted">${T.noneFound}</p>`; return; }
-  $('suggList').innerHTML = found.map((f, i) => {
+  $('suggList').innerHTML = (msg ? `<p class="muted">${esc(msg)}</p>` : '') + found.map((f, i) => {
     const off = f.configured || !f.has_token;
-    const note = f.configured ? T.already : !f.has_token ? T.noToken : f.host;
-    return `<div class="sugg${off ? ' used' : ''}" data-f="${off ? '' : i}">
+    const note = f.configured ? T.already : f.disabled ? T.tokDisabled : !f.has_token ? T.noToken : f.host;
+    const action = f.disabled ? `<button class="sec" data-enable="${i}">${T.enable}</button>` : (off ? '' : '›');
+    const grey = off && !f.disabled;
+    return `<div class="sugg${grey ? ' used' : ''}" data-f="${off ? '' : i}">
       <div class="ic">🔈</div>
       <div class="grow"><b>${esc(f.area || f.device)}</b> <span class="muted">${esc(f.model_name)}</span><div class="muted">${esc(note)}</div></div>
-      <div>${off ? '' : '›'}</div></div>`;
+      <div>${action}</div></div>`;
   }).join('');
   document.querySelectorAll('.sugg[data-f]').forEach(el => {
     if (el.dataset.f === '') return;
     el.onclick = () => { $('dlgAdd').close(); openEdit(null, found[Number(el.dataset.f)]); };
+  });
+  document.querySelectorAll('[data-enable]').forEach(b => b.onclick = async (ev) => {
+    ev.stopPropagation();
+    const f = found[Number(b.dataset.enable)];
+    b.disabled = true; b.textContent = T.enabling;
+    const r = await api('api/enable_token', { entity_id: f.token_entity });
+    if (!r.ok) { renderFound(T.enableFail + await r.text()); return; }
+    renderFound(T.enabled);
+    for (let k = 0; k < 9 && $('dlgAdd').open; k++) {   // HA reloads after ~30 s
+      await sleep(8000);
+      await loadFound();
+      const now = found.find(x => x.token_entity === f.token_entity);
+      if (now && !now.disabled && now.has_token) { renderFound(); return; }
+      renderFound(T.enabled);
+    }
+    if ($('dlgAdd').open) renderFound();
   });
 }
 $('addManual').onclick = () => { $('dlgAdd').close(); openEdit(null, null); };

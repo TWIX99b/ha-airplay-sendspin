@@ -19,7 +19,7 @@ RUN apt-get update \
       libavahi-client-dev avahi-daemon dbus \
       libplist-dev libplist-utils libsodium-dev libgcrypt20-dev uuid-dev xxd \
       libavutil-dev libavcodec-dev libavformat-dev libswresample-dev \
-      iproute2 jq procps \
+      iproute2 iputils-arping jq procps \
       python3 python3-pip python3-venv \
  && rm -rf /var/lib/apt/lists/*
 

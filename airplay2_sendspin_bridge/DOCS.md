@@ -41,11 +41,14 @@ iPhone ──AirPlay 2──► shairport-sync (pro Lautsprecher) ──PCM─�
 
 - Home Assistant OS bzw. Supervised, **per Kabel** am Netz. macvlan
   funktioniert nicht über WLAN.
-- Eine **freie IP im Netz von Home Assistant** für `ap2_ip`, außerhalb des
-  DHCP-Bereichs.
+- **Eine** freie IP im Netz von Home Assistant für `ap2_ip`, außerhalb des
+  DHCP-Bereichs – für alle Lautsprecher zusammen (sie unterscheiden sich nur
+  im Port). Beim Start prüft das Add-on per ARP, ob die IP wirklich frei ist;
+  antwortet dort schon ein Gerät, steht eine Warnung im Log und auf der Seite.
 - Pro Lautsprecher den **Sendspin-Pairing-Token**. Bei echo-dot-assist ist
-  das die Entität „Sendspin pairing token“. Sie ist ab Werk deaktiviert und
-  muss aktiviert werden.
+  das die Entität „Sendspin pairing token“. Sie ist ab Werk deaktiviert; beim
+  Hinzufügen eines Lautsprechers zeigt die Seite solche Echos mit dem Knopf
+  **Aktivieren** an (oder von Hand in HA aktivieren).
 - iPhone, iPad und Mac müssen die Lautsprecher per mDNS sehen. Liegen sie in einem
   anderen VLAN, muss die mDNS-Weiterleitung aktiv sein.
 
@@ -336,11 +339,14 @@ iPhone ──AirPlay 2──► shairport-sync (per speaker) ──PCM──► 
 
 - Home Assistant OS or Supervised, **wired** network. macvlan doesn't work
   over Wi-Fi.
-- A **free IP in Home Assistant's network** for `ap2_ip`, outside the DHCP
-  range.
+- **One** free IP in Home Assistant's network for `ap2_ip`, outside the DHCP
+  range – for all speakers together (they only differ in the port). At start
+  the add-on checks via ARP whether the IP really is free; if a device
+  answers there, the log and the page show a warning.
 - A **Sendspin pairing token** for each speaker. With echo-dot-assist this is
-  the "Sendspin pairing token" entity. It is disabled by default and must be
-  enabled.
+  the "Sendspin pairing token" entity. It is disabled by default; when adding
+  a speaker, the page lists such Echos with an **Enable** button (or enable
+  it by hand in HA).
 - iPhone, iPad and Mac must see the speakers via mDNS. If they are on another
   VLAN, mDNS forwarding has to be on.
 

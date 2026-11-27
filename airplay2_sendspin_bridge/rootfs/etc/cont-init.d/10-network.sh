@@ -38,6 +38,25 @@ bashio::log.info "Creating netns ap2: ${AP2_IP} on ${AP2_IF} (gateway ${AP2_GW:-
 ip netns del ap2 2>/dev/null || true
 ip link del ap2mv 2>/dev/null || true
 
+# Is the address really free? (warn only – the page shows it as well)
+AP2_ADDR="${AP2_IP%%/*}"
+rm -f /run/ap2/ip_conflict
+if ip -4 -o addr show | awk '{print $4}' | cut -d/ -f1 | grep -qxF "${AP2_ADDR}"; then
+  echo "${AP2_ADDR} host" > /run/ap2/ip_conflict
+  bashio::log.error "ap2_ip ${AP2_ADDR} belongs to this host itself. Choose a free IP in the network."
+elif command -v arping >/dev/null 2>&1; then
+  # Duplicate address detection: exit 1 = some device answered
+  ARP_OUT="$(arping -D -c 2 -w 3 -I "${AP2_IF}" "${AP2_ADDR}" 2>/dev/null)"
+  if [ $? -eq 1 ]; then
+    ARP_MAC="$(printf '%s\n' "${ARP_OUT}" | grep -o '\[[0-9A-Fa-f:]*\]' | head -n1 | tr -d '[]')"
+    echo "${AP2_ADDR} ${ARP_MAC:-unknown}" > /run/ap2/ip_conflict
+    bashio::log.error "ap2_ip ${AP2_ADDR} is already used by another device (${ARP_MAC:-unknown MAC})."
+    bashio::log.error "AirPlay will not work reliably. Choose a free IP (option ap2_ip)."
+  else
+    bashio::log.info "ap2_ip ${AP2_ADDR} is free."
+  fi
+fi
+
 if ! { ip netns add ap2 \
     && ip link add ap2mv link "${AP2_IF}" type macvlan mode bridge \
     && ip link set ap2mv netns ap2 \

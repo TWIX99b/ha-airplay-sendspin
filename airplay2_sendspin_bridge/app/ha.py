@@ -95,6 +95,91 @@ async def ha_config() -> dict:
         return {}
 
 
+TOKEN_SUFFIX = "_sendspin_pairing_token"
+
+
+async def ws_commands(*commands: dict) -> list[dict]:
+    """Run WebSocket commands one after another; their results (or [])."""
+    token = os.environ.get("SUPERVISOR_TOKEN")
+    if not token:
+        return []
+    results = []
+    try:
+        async with (
+            aiohttp.ClientSession() as session,
+            session.ws_connect(
+                CORE_WS, timeout=aiohttp.ClientWSTimeout(ws_close=10)
+            ) as ws,
+        ):
+            await ws.receive_json(timeout=10)  # auth_required
+            await ws.send_json({"type": "auth", "access_token": token})
+            if (await ws.receive_json(timeout=10)).get("type") != "auth_ok":
+                return []
+            for i, cmd in enumerate(commands, start=1):
+                await ws.send_json({"id": i, **cmd})
+                while True:
+                    reply = await ws.receive_json(timeout=15)
+                    if reply.get("id") == i and reply.get("type") == "result":
+                        break
+                results.append(reply)
+    except (TimeoutError, aiohttp.ClientError, ValueError, TypeError) as err:
+        log.warning("HA WebSocket command: %s", err)
+    return results
+
+
+async def disabled_token_entities() -> list[dict]:
+    """Sendspin speakers whose pairing-token entity is disabled in HA.
+
+    Disabled entities have no state, so the template-based discovery cannot
+    see them; the entity and device registries can.
+    """
+    replies = await ws_commands(
+        {"type": "config/entity_registry/list"},
+        {"type": "config/device_registry/list"},
+        {"type": "config/area_registry/list"},
+    )
+    if len(replies) != 3 or not all(r.get("success") for r in replies):
+        return []
+    entities, devices, areas = (r.get("result") or [] for r in replies)
+    dev_by_id = {d.get("id"): d for d in devices}
+    area_names = {a.get("area_id"): a.get("name") for a in areas}
+    out = []
+    for e in entities:
+        eid = e.get("entity_id", "")
+        if not eid.startswith("sensor.") or not eid.endswith(TOKEN_SUFFIX):
+            continue
+        if not e.get("disabled_by"):
+            continue
+        dev = dev_by_id.get(e.get("device_id")) or {}
+        out.append(
+            {
+                "token_entity": eid,
+                "device": dev.get("name_by_user") or dev.get("name") or eid,
+                "model": dev.get("model"),
+                "area": area_names.get(e.get("area_id") or dev.get("area_id")),
+                "disabled_by": e.get("disabled_by"),
+            }
+        )
+    return out
+
+
+async def enable_entity(entity_id: str) -> dict | None:
+    """Enable an entity; HA reloads its integration after a short delay."""
+    replies = await ws_commands(
+        {
+            "type": "config/entity_registry/update",
+            "entity_id": entity_id,
+            "disabled_by": None,
+        }
+    )
+    if not replies or not replies[0].get("success"):
+        log.warning("Enabling %s failed: %s", entity_id, replies and replies[0])
+        return None
+    result = replies[0].get("result") or {}
+    log.info("Enabled %s in Home Assistant", entity_id)
+    return {"reload_delay": result.get("reload_delay")}
+
+
 class SatelliteWatcher:
     """Calls callback(entity_id, state) whenever a watched satellite changes."""
 
