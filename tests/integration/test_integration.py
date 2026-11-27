@@ -179,7 +179,7 @@ async def test_attached_to_echo_device(hass: HomeAssistant, addon) -> None:
         "sensor",
         "hassmic",
         "wohnzimmer_token",
-        suggested_object_id="stube_sendspin_pairing_token",
+        suggested_object_id="wohnzimmer_sendspin_pairing_token",
         device_id=device.id,
         config_entry=echo_entry,
     )
