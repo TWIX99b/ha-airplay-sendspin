@@ -98,15 +98,15 @@ async def test_hassio_discovery(hass: HomeAssistant, addon) -> None:
 
 async def test_entities_and_push(hass: HomeAssistant, addon) -> None:
     entry = await setup(hass, addon)
-    playing = eid(hass, "binary_sensor", "stube_echo_airplay")
-    track = eid(hass, "sensor", "stube_echo_track")
-    dropouts = eid(hass, "sensor", "stube_echo_dropouts")
-    offset = eid(hass, "number", "stube_echo_offset")
-    volume = eid(hass, "number", "stube_echo_airplay_volume")
-    night = eid(hass, "switch", "stube_echo_night_mode")
-    cover = eid(hass, "image", "stube_echo_cover")
-    eid(hass, "button", "stube_echo_test_tone")
-    eid(hass, "number", "stube_echo_trim")
+    playing = eid(hass, "binary_sensor", "wohnzimmer_echo_airplay")
+    track = eid(hass, "sensor", "wohnzimmer_echo_track")
+    dropouts = eid(hass, "sensor", "wohnzimmer_echo_dropouts")
+    offset = eid(hass, "number", "wohnzimmer_echo_offset")
+    volume = eid(hass, "number", "wohnzimmer_echo_airplay_volume")
+    night = eid(hass, "switch", "wohnzimmer_echo_night_mode")
+    cover = eid(hass, "image", "wohnzimmer_echo_cover")
+    eid(hass, "button", "wohnzimmer_echo_test_tone")
+    eid(hass, "number", "wohnzimmer_echo_trim")
 
     assert hass.states.get(playing).state == STATE_OFF
     assert float(hass.states.get(offset).state) == -225
@@ -158,7 +158,7 @@ async def test_entities_and_push(hass: HomeAssistant, addon) -> None:
 
 async def test_test_tone(hass: HomeAssistant, addon) -> None:
     entry = await setup(hass, addon)
-    button = eid(hass, "button", "stube_echo_test_tone")
+    button = eid(hass, "button", "wohnzimmer_echo_test_tone")
     await hass.services.async_call(
         "button", "press", {"entity_id": button}, blocking=True
     )
@@ -185,7 +185,7 @@ async def test_attached_to_echo_device(hass: HomeAssistant, addon) -> None:
     )
     entry = await setup(hass, addon)
     entity = er.async_get(hass).async_get(
-        eid(hass, "binary_sensor", "stube_echo_airplay")
+        eid(hass, "binary_sensor", "wohnzimmer_echo_airplay")
     )
     assert entity.device_id == device.id
     assert await hass.config_entries.async_unload(entry.entry_id)

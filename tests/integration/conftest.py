@@ -15,15 +15,15 @@ TOKEN = "test-token-0123456789abcdefghijklmnopqrstuvwxyz"
 
 ZONE = {
     "index": 0,
-    "name": "Stube Echo",
-    "key": "stube_echo",
+    "name": "Wohnzimmer Echo",
+    "key": "wohnzimmer_echo",
     "speakers": [
         {
-            "label": "Stube Echo",
+            "label": "Wohnzimmer Echo",
             "host": "192.0.2.10",
             "channel": "stereo",
             "paired": True,
-            "token_entity": "sensor.stube_sendspin_pairing_token",
+            "token_entity": "sensor.wohnzimmer_sendspin_pairing_token",
         }
     ],
     "track": None,

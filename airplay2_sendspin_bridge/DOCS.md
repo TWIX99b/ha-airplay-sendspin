@@ -211,7 +211,7 @@ einer aus, spielt der andere weiter.
 ### Integration „AirPlay Bridge“ (Entitäten in HA)
 
 Seit 0.8 gibt es statt MQTT eine eigene Integration. Sie hängt die
-AirPlay-Entitäten **direkt an das Gerät des Echos** (z. B. „OG Stube
+AirPlay-Entitäten **direkt an das Gerät des Echos** (z. B. „Wohnzimmer
 Satellit“), gleich neben Sprachassistent und Media Player:
 
 | Entität | Was |
