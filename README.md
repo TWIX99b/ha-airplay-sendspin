@@ -3,7 +3,7 @@
 ![logo](airplay2_sendspin_bridge/logo.png)
 
 [![Test & build](https://github.com/TWIX99b/ha-airplay-sendspin/actions/workflows/build.yaml/badge.svg)](https://github.com/TWIX99b/ha-airplay-sendspin/actions/workflows/build.yaml)
-![Version](https://img.shields.io/badge/version-0.7.0-blue)
+[![Version](https://img.shields.io/github/v/release/TWIX99b/ha-airplay-sendspin?label=version)](https://github.com/TWIX99b/ha-airplay-sendspin/releases)
 ![Arch](https://img.shields.io/badge/arch-amd64%20%7C%20aarch64-lightgrey)
 
 [🇩🇪 Deutsch](#deutsch) · [🇬🇧 English](#english)
@@ -29,6 +29,11 @@ gruppieren und spielen synchron.
 HomePod mini.
 
 ### Funktionen
+
+<p>
+  <img src="docs/speakers.png" alt="Seite „AirPlay Bridge“: Lautsprecher als Kacheln" width="62%">
+  <img src="docs/calibrate.png" alt="Einmessen nach Gehör" width="30%">
+</p>
 
 - **AirPlay 2 für Echos:** jeder Lautsprecher erscheint auf iPhone, iPad und
   Mac, gruppierbar mit HomePod, Sonos & Co., synchron.
@@ -70,9 +75,10 @@ Alles Weitere – Konfiguration, Einmessen, Messwerte-Tabelle – in der
 
 Pro Lautsprecher läuft eine
 [shairport-sync](https://github.com/mikebrady/shairport-sync)-Instanz
-(AirPlay 2, mit [nqptp](https://github.com/mikebrady/nqptp)). Alle laufen in
-einem eigenen Netzwerk-Namespace mit eigener IP, damit sie sich nicht mit
-Music Assistant um die UDP-Ports 319/320 streiten. Die Bridge versieht jedes
+(AirPlay 2, mit [nqptp](https://github.com/mikebrady/nqptp)). Alle laufen
+gemeinsam in einem eigenen Netzwerk-Namespace mit **einer** zusätzlichen IP
+(jeder Lautsprecher bekommt dort nur einen eigenen Port), damit sie sich
+nicht mit Music Assistant um die UDP-Ports 319/320 streiten. Die Bridge versieht jedes
 Tonstück mit einem Zeitstempel in der Sendspin-Uhr und schickt es per
 [aiosendspin](https://github.com/Sendspin/aiosendspin) an den Lautsprecher.
 Den Lautsprecher übernimmt sie nur, solange AirPlay spielt. Danach steht er
@@ -81,10 +87,13 @@ wieder Music Assistant zur Verfügung.
 ### Voraussetzungen
 
 - Home Assistant OS bzw. Supervised, **per Kabel** angeschlossen
-- eine freie IP im HA-Netz
+- **eine** freie IP im HA-Netz – für alle Lautsprecher zusammen (das Add-on
+  prüft beim Start, ob sie wirklich frei ist)
 - Sendspin-Pairing-Token pro Lautsprecher (echo-dot-assist: Entität
-  „Sendspin pairing token“ aktivieren)
-- fürs Einmessen: HA über **HTTPS** öffnen (Mikrofon im Browser)
+  „Sendspin pairing token“; ist sie deaktiviert, aktiviert die Seite sie per
+  Knopf)
+- fürs Einmessen per Mikrofon: HA über **HTTPS** öffnen (nach Gehör geht es
+  ohne)
 
 ---
 
@@ -99,6 +108,11 @@ Sonos and other AirPlay 2 speakers, and they play in sync.
 HomePod mini.
 
 ### Features
+
+<p>
+  <img src="docs/speakers.png" alt="Page &quot;AirPlay Bridge&quot;: speakers as tiles" width="62%">
+  <img src="docs/calibrate.png" alt="Calibrating by ear" width="30%">
+</p>
 
 - **AirPlay 2 for Echos:** each speaker shows up on iPhone, iPad and Mac,
   groupable with HomePod, Sonos & co., in sync.
@@ -138,8 +152,9 @@ Everything else – configuration, calibration, measured values – in
 
 One [shairport-sync](https://github.com/mikebrady/shairport-sync) instance
 (AirPlay 2, with [nqptp](https://github.com/mikebrady/nqptp)) runs per speaker.
-All of them run in their own network namespace with a dedicated IP, so they
-don't clash with Music Assistant on UDP 319/320. The bridge timestamps the
+All of them share their own network namespace with **one** extra IP (each
+speaker only gets its own port there), so they don't clash with Music
+Assistant on UDP 319/320. The bridge timestamps the
 PCM in the Sendspin clock and pushes it with
 [aiosendspin](https://github.com/Sendspin/aiosendspin). It takes over the
 speaker only while AirPlay is playing and hands it back to Music Assistant
@@ -148,10 +163,12 @@ afterwards.
 ### Requirements
 
 - Home Assistant OS or Supervised, **wired** network connection
-- a free IP in HA's network
-- a Sendspin pairing token for each speaker (echo-dot-assist: enable the
-  entity "Sendspin pairing token")
-- for calibration: open HA via **HTTPS** (microphone in the browser)
+- **one** free IP in HA's network – for all speakers together (the add-on
+  checks at start whether it really is free)
+- a Sendspin pairing token for each speaker (echo-dot-assist: entity
+  "Sendspin pairing token"; if it is disabled, the page enables it with a
+  button)
+- for calibrating by microphone: open HA via **HTTPS** (by ear works without)
 
 ---
 

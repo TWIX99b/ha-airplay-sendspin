@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.1
+
+- **IP check at start:** before creating the AirPlay IP (`ap2_ip`) the
+  add-on checks whether it belongs to the HA host or whether another device
+  already answers on it (ARP duplicate address detection). If so: error in
+  the log and a warning on the page.
+- **Enable token entities from the page:** "Add speaker" now also lists
+  Echos whose "Sendspin pairing token" entity is disabled in HA (they have
+  no state, so they were invisible before) – with an **Enable** button; the
+  Echo shows up ready once HA has reloaded it.
+- README: one IP for all speakers made clear, version badge follows the
+  latest release, screenshots (demo data).
+
 ## 0.9.0
 
 - **Stable timing:** the bridge used to anchor every AirPlay session on the

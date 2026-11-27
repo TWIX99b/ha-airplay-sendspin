@@ -45,7 +45,7 @@ from typing import TYPE_CHECKING
 import aiohttp
 import speakers
 from aiohttp import web
-from ha import render_template
+from ha import TOKEN_SUFFIX, disabled_token_entities, enable_entity, render_template
 
 if TYPE_CHECKING:
     from bridge import Zone
@@ -158,6 +158,18 @@ def build_level_wav() -> bytes:
         wav.setframerate(LEVEL_RATE)
         wav.writeframes(cycle * int(CLICK_SECONDS / LEVEL_CYCLE_S))
     return buf.getvalue()
+
+
+IP_CONFLICT_FILE = Path("/run/ap2/ip_conflict")
+
+
+def read_ip_conflict() -> dict | None:
+    """Written at start by 10-network.sh if the AirPlay IP is not free."""
+    try:
+        ip, _, by = IP_CONFLICT_FILE.read_text(encoding="utf-8").strip().partition(" ")
+    except OSError:
+        return None
+    return {"ip": ip, "by": by or "unknown"} if ip else None
 
 
 def read_options() -> dict:
@@ -449,6 +461,7 @@ def create_app(zones: list[Zone], token: str = "") -> web.Application:
         return web.json_response(
             {
                 "boot": BOOT_ID,
+                "ip_conflict": read_ip_conflict(),
                 "zones": [speakers.public_zone(z) for z in opts.get("zones", [])],
             }
         )
@@ -477,7 +490,19 @@ def create_app(zones: list[Zone], token: str = "") -> web.Application:
         if rendered is None:
             raise web.HTTPBadGateway(text="Home Assistant not reachable")
         found = speakers.parse_discovery(rendered, read_options().get("zones", []))
+        found = speakers.add_disabled(found, await disabled_token_entities())
         return web.json_response(found)
+
+    async def enable_token(request: web.Request) -> web.Response:
+        body = await request.json()
+        entity_id = str(body.get("entity_id", ""))
+        # only ever the Sendspin pairing-token sensors, nothing else
+        if not (entity_id.startswith("sensor.") and entity_id.endswith(TOKEN_SUFFIX)):
+            raise web.HTTPBadRequest(text="not a Sendspin pairing-token entity")
+        result = await enable_entity(entity_id)
+        if result is None:
+            raise web.HTTPBadGateway(text="Home Assistant did not enable the entity")
+        return web.json_response({"ok": True, **result})
 
     # ---- API of the Home Assistant integration (token, see middleware) ----
     sockets: set[web.WebSocketResponse] = set()
@@ -537,6 +562,7 @@ def create_app(zones: list[Zone], token: str = "") -> web.Application:
     app.router.add_get("/api/config", get_config)
     app.router.add_put("/api/config", put_config)
     app.router.add_get("/api/discover", discover)
+    app.router.add_post("/api/enable_token", enable_token)
 
     async def test_tone(request: web.Request) -> web.Response:
         zone = zone_or_404(request)

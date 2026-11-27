@@ -416,6 +416,22 @@ def test_speakers():
     check(found[0]["model_name"] == "Echo 2", "discovery: model name")
     check(found[0]["suggested_name"] == "Bad Echo", "discovery: suggested name")
     check(speakers.parse_discovery("garbage", []) == [], "discovery: bad input")
+    merged = speakers.add_disabled(
+        found,
+        [
+            {"token_entity": found[0]["token_entity"], "device": "dup"},
+            {"token_entity": "sensor.x_sendspin_pairing_token", "device": "X",
+             "model": "echo-dot-3", "area": "Keller"},
+        ],
+    )
+    extra = next(m for m in merged if m.get("disabled"))
+    check(len(merged) == len(found) + 1, "discovery: disabled added once")
+    first_done = next((k for k, m in enumerate(merged) if m["configured"]), len(merged))
+    check(merged.index(extra) < first_done, "discovery: disabled before configured")
+    check(
+        extra["disabled"] and not extra["has_token"] and extra["model_name"] == "Echo Dot 3",
+        "discovery: disabled entry marked",
+    )
 
 
 def test_night_and_volume():

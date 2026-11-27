@@ -240,3 +240,31 @@ def parse_discovery(rendered: str, zones: list) -> list[dict]:
         )
     out.sort(key=lambda s: (s["configured"], s["area"] or s["device"]))
     return out
+
+
+def add_disabled(found: list[dict], disabled: list[dict]) -> list[dict]:
+    """Append speakers whose token entity is disabled (to be enabled)."""
+    known = {f["token_entity"] for f in found}
+    extra = [
+        {
+            "token_entity": d["token_entity"],
+            "device": d.get("device") or "",
+            "model": d.get("model") or "",
+            "model_name": model_name(d.get("model")),
+            "area": d.get("area") or "",
+            "host": "",
+            "port": DEFAULT_PORT,
+            "satellite_entity": "",
+            "has_token": False,
+            "disabled": True,
+            "suggested_name": "",
+            "configured": False,
+        }
+        for d in disabled
+        if d.get("token_entity") not in known
+    ]
+    extra.sort(key=lambda s: s["area"] or s["device"])
+    # after the ready ones, before those already set up
+    ready = [f for f in found if not f.get("configured")]
+    done = [f for f in found if f.get("configured")]
+    return ready + extra + done
