@@ -1,5 +1,5 @@
 name: AirPlay 2 → Sendspin Bridge
-version: "0.9.6"
+version: "0.9.7"
 slug: airplay2_sendspin_bridge
 description: >-
   Turns Sendspin speakers (e.g. Echos with echo-dot-assist) into real AirPlay 2
@@ -55,6 +55,7 @@ schema:
   report_model: bool
   airplay_icon: list(standard|airport_express)
   icon_model: str?
+  device_id_style: list(local|vendor)?
   icon_manufacturer: str?
   metadata: bool
   log_level: list(debug|info|warning|error)

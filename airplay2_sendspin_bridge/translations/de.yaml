@@ -62,6 +62,12 @@ configuration:
       Freie Modellkennung für alle Lautsprecher, z. B. die eines anderen
       AirPlay-Lautsprechers. Gilt vor „Symbol im AirPlay-Menü“. Leer = aus.
       Wirkt nach einem Neustart.
+  device_id_style:
+    name: Geräte-ID (Experiment)
+    description: >-
+      „local“ = künstliche ID ohne Hersteller (bisher). „vendor“ = ID mit
+      Amazon-Herstellerkennung wie die echte MAC eines Echos. Für iOS sind das
+      neue Geräte (Gruppen ggf. neu anhaken). Wirkt nach einem Neustart.
   icon_manufacturer:
     name: Eigener Hersteller (Experiment)
     description: >-
