@@ -119,6 +119,7 @@ zones:
 | `zones[].partner_host` usw. | Zweiter Lautsprecher als Stereo-Paar, siehe unten. |
 | `report_model` | Meldet AirPlay das echte Modell und den Hersteller (z. B. „Echo 2“ von Amazon) statt „ShairportSync“ (Standard an). Ändert das Symbol nicht. |
 | `airplay_icon` | Symbol im AirPlay-Menü: `standard` oder als Experiment `airport_express` (siehe unten). |
+| `icon_model`, `icon_manufacturer` | Experiment: freie Modellkennung und Hersteller für alle Lautsprecher (gilt vor `airplay_icon`). |
 | `zones[].speaker_volume` | AirPlay-Lautstärke dieses Lautsprechers in %, überschreibt `speaker_volume`. |
 | `zones[].night_volume`, `night_start`, `night_end` | Nachtmodus: zwischen Start und Ende höchstens so viel % (z. B. 40, 22:00, 07:00). |
 
@@ -397,6 +398,7 @@ edited there by hand.
 | `zones[].partner_host` etc. | Second speaker as a stereo pair, see below. |
 | `report_model` | Tells AirPlay the real model and manufacturer (e.g. "Echo 2" by Amazon) instead of "ShairportSync" (default on). Does not change the icon. |
 | `airplay_icon` | Icon in the AirPlay menu: `standard` or, as an experiment, `airport_express` (see below). |
+| `icon_model`, `icon_manufacturer` | Experiment: any model identifier and manufacturer for all speakers (wins over `airplay_icon`). |
 | `zones[].speaker_volume` | AirPlay volume of this speaker in %, overrides `speaker_volume`. |
 | `zones[].night_volume`, `night_start`, `night_end` | Night mode: at most this % between start and end (e.g. 40, 22:00, 07:00). |
 
