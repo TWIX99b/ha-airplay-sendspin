@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.4
+
+- **Security:** the integration token is no longer written to the add-on log
+  (logs get shared). It is shown on the add-on page instead (at the bottom,
+  "Home Assistant – set up the integration by hand"). If you shared a log of
+  0.8–0.9.3: reinstalling the add-on creates a new token.
+- "Add speaker" did not find disabled token entities on bigger HA setups: the
+  entity registry (> 4 MB) exceeded the WebSocket message limit.
+
 ## 0.9.3
 
 - **HA: "AirPlay volume now"** (new sensor): the volume AirPlay uses right

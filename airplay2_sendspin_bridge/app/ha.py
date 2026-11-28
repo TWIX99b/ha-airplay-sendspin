@@ -108,7 +108,9 @@ async def ws_commands(*commands: dict) -> list[dict]:
         async with (
             aiohttp.ClientSession() as session,
             session.ws_connect(
-                CORE_WS, timeout=aiohttp.ClientWSTimeout(ws_close=10)
+                CORE_WS,
+                timeout=aiohttp.ClientWSTimeout(ws_close=10),
+                max_msg_size=0,  # the entity registry can be several MB
             ) as ws,
         ):
             await ws.receive_json(timeout=10)  # auth_required

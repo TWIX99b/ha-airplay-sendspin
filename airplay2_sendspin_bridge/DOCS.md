@@ -244,8 +244,8 @@ Satellit“), gleich neben Sprachassistent und Media Player:
 2. Das Add-on meldet sich selbst: Unter Einstellungen → Geräte & Dienste
    erscheint **„AirPlay Bridge gefunden“** → Konfigurieren → Absenden.
 3. Von Hand (falls nichts erscheint): Integration hinzufügen → „AirPlay
-   Bridge“ → Adresse `127.0.0.1`, Port `8099`, Token aus dem Add-on-Log
-   (Zeile „HA integration: … token …“).
+   Bridge“ → Adresse `127.0.0.1`, Port `8099`, Token von der Add-on-Seite
+   (ganz unten, „Home Assistant – Integration von Hand einrichten“).
 
 Die Werte kommen live: Das Add-on meldet jede Änderung sofort, ohne
 Abfrage-Intervall. Ein MQTT-Broker ist nicht mehr nötig.
@@ -517,8 +517,8 @@ satellite"), next to the voice assistant and media player:
 2. The add-on announces itself: Settings → Devices & services shows
    **"AirPlay Bridge discovered"** → Configure → Submit.
 3. By hand (if nothing shows up): Add integration → "AirPlay Bridge" →
-   host `127.0.0.1`, port `8099`, token from the add-on log (line "HA
-   integration: … token …").
+   host `127.0.0.1`, port `8099`, token from the add-on page (at the bottom,
+   "Home Assistant – set up the integration by hand").
 
 Values arrive live: the add-on reports every change at once, no polling.
 An MQTT broker is no longer needed.
