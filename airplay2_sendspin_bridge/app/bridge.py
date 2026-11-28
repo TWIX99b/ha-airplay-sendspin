@@ -91,6 +91,10 @@ VOICE_IDLE_HOLD_S = 2.0
 # Test tone (web UI): a short two-tone chime straight to the speaker(s)
 TONE_GAP_S = 0.9  # stereo pair: left first, then right
 TONE_LEAD_US = 400_000
+# The speaker reports its volume in its own steps (60 → 62): only a bigger
+# difference counts as "someone turned it by hand".
+VOLUME_TOLERANCE = 5
+TONE_MIN_VOLUME = 40  # a test tone at 3 % is no test: at least this loud
 MANUFACTURERS = {"echo": "Amazon"}  # model prefix → manufacturer if HA has none
 PCM_FORMAT = AudioFormat(sample_rate=SAMPLE_RATE, bit_depth=16, channels=CHANNELS)
 
@@ -460,6 +464,7 @@ class Link:
     volume_before: int | None = None  # set when we turned it up for AirPlay
     lowered: bool = False  # back at volume_before for the voice assistant
     volume_target: int = 0  # what we set for AirPlay (0 = untouched)
+    kept_logged: bool = False  # "changed by hand" already logged
     restore_task: asyncio.Task | None = field(default=None, repr=False)
 
 
@@ -590,7 +595,7 @@ class Zone:
         self.cfg.night_start = z.get("night_start") or "22:00"
         self.cfg.night_end = z.get("night_end") or "07:00"
         self.cfg.night_enabled = bool(z.get("night_enabled", True))
-        self._follow_target()
+        self._follow_target(force=True)  # set on purpose: always applies
         self._notify()
 
     def _take_volume(self, link: Link) -> None:
@@ -598,6 +603,7 @@ class Zone:
         link.volume_before = None
         link.lowered = False
         link.volume_target = 0
+        link.kept_logged = False
         target = self.target_volume()
         player = link.player
         if target <= 0 or player is None:
@@ -618,8 +624,12 @@ class Zone:
                 " (night mode)" if self.night_active() else "",
             )
 
-    def _follow_target(self) -> None:
-        """Night mode began/ended or settings changed while playing."""
+    def _follow_target(self, force: bool = False) -> None:
+        """Night mode began/ended or settings changed while playing.
+
+        force: the user changed the setting (page / HA) – apply it even if
+        the speaker's volume was changed by hand before.
+        """
         if not self.streaming:
             return
         target = self.target_volume()
@@ -629,8 +639,18 @@ class Zone:
                 continue
             if target == link.volume_target or target <= 0:
                 continue
-            if abs(player.volume - link.volume_target) > 1:
-                continue  # changed on the speaker: leave it
+            if not force and abs(player.volume - link.volume_target) > VOLUME_TOLERANCE:
+                if not link.kept_logged:
+                    link.kept_logged = True
+                    self.log.info(
+                        "[%s] volume changed on the speaker (%d, set %d): "
+                        "not switching to %d",
+                        link.cfg.label,
+                        player.volume,
+                        link.volume_target,
+                        target,
+                    )
+                continue
             with contextlib.suppress(Exception):
                 player.set_volume(target)
             self.log.info(
@@ -653,7 +673,7 @@ class Zone:
         player = link.player
         if before is None or player is None or lowered or before == target:
             return  # nothing changed, or already back for the voice assistant
-        if abs(player.volume - target) > 1:
+        if abs(player.volume - target) > VOLUME_TOLERANCE:
             self.log.info(
                 "[%s] volume was changed during AirPlay (%d), keeping it",
                 link.cfg.label,
@@ -714,9 +734,12 @@ class Zone:
             info = None
         if info == self.track:
             return
+        old_cover = self.track.cover if self.track else None
         self.track = info
         if info is not None:
             self.log.info("Now playing: %s – %s", info.artist, info.title)
+            if info.cover and info.cover != old_cover:
+                self.log.info("Cover received (%d KB)", len(info.cover) // 1024)
         if self.streaming:
             asyncio.ensure_future(self._push_track(self.active))
         self._notify()
@@ -941,7 +964,19 @@ class Zone:
             active = [link for link, ok in zip(ready, results, strict=True) if ok]
             if not active:
                 return False
+            raised: list[tuple[Link, int]] = []
             try:
+                for link in active:
+                    player = link.player
+                    if (
+                        player is not None
+                        and PlayerCommand.VOLUME in player.state_supported_commands
+                        and player.volume < TONE_MIN_VOLUME
+                    ):
+                        raised.append((link, player.volume))
+                        player.set_volume(TONE_MIN_VOLUME)
+                if raised:
+                    await asyncio.sleep(0.2)  # volume first, then the tone
                 total = TONE_GAP_S * len(active) + 0.4
                 for link in active:
                     link.stream = link.group.start_stream()
@@ -957,6 +992,15 @@ class Zone:
                 self.log.info("Test tone on %s", self.cfg.host)
                 await asyncio.sleep(total + TONE_LEAD_US / 1e6 + 0.3)
             finally:
+                for link, before in raised:
+                    with contextlib.suppress(Exception):
+                        link.player.set_volume(before)
+                if raised:
+                    self.log.info(
+                        "Test tone at %d %% (speaker was quieter), volume restored",
+                        TONE_MIN_VOLUME,
+                    )
+                    await asyncio.sleep(0.3)  # let the command go out
                 for link in active:
                     with contextlib.suppress(Exception):
                         await link.group.stop()

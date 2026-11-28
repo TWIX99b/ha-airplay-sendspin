@@ -264,8 +264,9 @@ Weitere Optionen) und einem Raum zuordnen.
 
 **Test-Ton:** Der ♪-Knopf auf der Kachel spielt direkt über das Add-on einen
 kurzen Ton auf dem Echo, ohne iPhone und AirPlay – zum Prüfen von Kopplung und
-IP. Ein Stereo-Paar spielt ihn erst links, dann rechts. Die Lautstärke des
-Echos bleibt dabei unverändert.
+IP. Ein Stereo-Paar spielt ihn erst links, dann rechts. Ist der Echo leiser
+als 40 % gestellt, kommt der Ton mit 40 %; danach gilt wieder die alte
+Lautstärke.
 
 **Verbindung:** Die Kachel zeigt, wie oft es seit dem Start des Add-ons
 gehakt hat (Nachsynchronisierung, Lücke, verlorener Lautsprecher) und wie
@@ -534,7 +535,8 @@ assigned to a room.
 
 **Test tone:** The ♪ button on the tile plays a short tone on the Echo
 straight from the add-on, without iPhone or AirPlay – to check pairing and IP.
-A stereo pair plays it left first, then right. The Echo's volume stays as is.
+A stereo pair plays it left first, then right. If the Echo is set below 40 %,
+the tone plays at 40 %; the old volume is restored afterwards.
 
 **Connection:** The tile shows how often it hiccupped since the add-on
 started (resync, gap, lost speaker) and how much music played: good below 1

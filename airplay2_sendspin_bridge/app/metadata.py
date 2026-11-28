@@ -20,6 +20,7 @@ import logging
 import os
 import re
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -62,10 +63,17 @@ def _code(hex8: bytes) -> str:
 class MetadataParser:
     """Turns the byte stream into TrackInfo updates (pure logic, no I/O)."""
 
-    def __init__(self) -> None:
+    # With AirPlay 2 the cover often arrives *before* the text block of the
+    # same track. A cover that came this shortly before a new title belongs
+    # to it and is kept; an older one belongs to the previous track.
+    COVER_WINDOW_S = 5.0
+
+    def __init__(self, clock: Callable[[], float] = time.monotonic) -> None:
         self.buffer = b""
         self.current = TrackInfo()
         self._pending: dict[str, str] | None = None
+        self._clock = clock
+        self._cover_at = float("-inf")
 
     def feed(self, data: bytes) -> list[TrackInfo | None]:
         """Returns the updates contained in data (None = playback ended)."""
@@ -109,14 +117,20 @@ class MetadataParser:
             self._pending = None
             if not changed:
                 return False
-            self.current = replace(self.current, cover=None, **fields)
+            fresh = self._clock() - self._cover_at <= self.COVER_WINDOW_S
+            cover = self.current.cover if fresh else None
+            self._cover_at = float("-inf")  # used up: the next title needs its own
+            self.current = replace(self.current, cover=cover, **fields)
             return self.current
         if (kind, code) == ("ssnc", "PICT"):
+            self._cover_at = self._clock()
+            log.debug("cover received (%d bytes)", len(payload))
             self.current = replace(self.current, cover=payload or None)
             return self.current
         if (kind, code) == ("ssnc", "pend"):  # playback ended
             self.current = TrackInfo()
             self._pending = None
+            self._cover_at = float("-inf")
             return None
         return False
 

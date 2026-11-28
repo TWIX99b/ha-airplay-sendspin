@@ -300,6 +300,35 @@ def test_metadata():
     check(same == [], "metadata: unchanged block → no update")
     check(p.feed(meta_item("ssnc", "pend")) == [None], "metadata: end → None")
 
+    # AirPlay 2: the cover often comes BEFORE the title block of its track
+    now = [100.0]
+    p = metadata.MetadataParser(clock=lambda: now[0])
+
+    def block(title):
+        return (
+            meta_item("ssnc", "mdst")
+            + meta_item("core", "minm", title.encode())
+            + meta_item("core", "asar", b"Band")
+            + meta_item("ssnc", "mden")
+        )
+
+    ups = p.feed(meta_item("ssnc", "PICT", b"\xff\xd8cover1") + block("Eins"))
+    check(
+        ups[-1].title == "Eins" and ups[-1].cover == b"\xff\xd8cover1",
+        "metadata: cover before title is kept",
+    )
+    now[0] += 200  # next track, its cover only comes later
+    ups = p.feed(block("Zwei"))
+    check(
+        ups[-1].title == "Zwei" and ups[-1].cover is None,
+        "metadata: old cover not shown for the next title",
+    )
+    ups = p.feed(meta_item("ssnc", "PICT", b"\xff\xd8cover2"))
+    check(ups[-1].cover == b"\xff\xd8cover2", "metadata: late cover arrives")
+    now[0] += 1  # third track: cover first, title right after
+    ups = p.feed(meta_item("ssnc", "PICT", b"\xff\xd8cover3") + block("Drei"))
+    check(ups[-1].cover == b"\xff\xd8cover3", "metadata: cover-first again")
+
 
 def test_zone_state():
     import web
@@ -420,8 +449,12 @@ def test_speakers():
         found,
         [
             {"token_entity": found[0]["token_entity"], "device": "dup"},
-            {"token_entity": "sensor.x_sendspin_pairing_token", "device": "X",
-             "model": "echo-dot-3", "area": "Keller"},
+            {
+                "token_entity": "sensor.x_sendspin_pairing_token",
+                "device": "X",
+                "model": "echo-dot-3",
+                "area": "Keller",
+            },
         ],
     )
     extra = next(m for m in merged if m.get("disabled"))
@@ -429,7 +462,9 @@ def test_speakers():
     first_done = next((k for k, m in enumerate(merged) if m["configured"]), len(merged))
     check(merged.index(extra) < first_done, "discovery: disabled before configured")
     check(
-        extra["disabled"] and not extra["has_token"] and extra["model_name"] == "Echo Dot 3",
+        extra["disabled"]
+        and not extra["has_token"]
+        and extra["model_name"] == "Echo Dot 3",
         "discovery: disabled entry marked",
     )
 
@@ -512,6 +547,41 @@ async def test_follow_night():
     await zone._give_volume_back(link)
     check(side.players["A"].volume == 30, "night: old volume back after session")
 
+    # the Echo reports its own rounding (60 → 62): settings still apply
+    zone._take_volume(link)
+    zone.apply_settings(
+        {
+            "speaker_volume": 60,
+            "night_volume": 30,
+            "night_start": "00:00",
+            "night_end": "00:00",
+        }
+    )
+    check(side.players["A"].volume == 60, "night: per-speaker 60 applied")
+    side.players["A"].volume = 62  # speaker's own steps
+    zone.apply_settings(
+        {
+            "speaker_volume": 60,
+            "night_volume": 30,
+            "night_start": "00:00",
+            "night_end": "23:59",
+        }
+    )
+    check(side.players["A"].volume == 30, "night: applies despite speaker rounding")
+    # automatic switch respects a real change by hand
+    zone.apply_settings(
+        {
+            "speaker_volume": 60,
+            "night_volume": 30,
+            "night_start": "00:00",
+            "night_end": "00:00",
+        }
+    )
+    side.players["A"].volume = 85  # turned up by hand
+    zone.cfg.night_end = "23:59"
+    zone._follow_target()
+    check(side.players["A"].volume == 85, "night: automatic switch keeps a hand change")
+
 
 async def test_tone_pair():
     cfg = bridge.zone_config(
@@ -543,6 +613,18 @@ async def test_tone_pair():
     check(side.players["A"].history == [], "test tone: volume untouched")
     zone.streaming = True
     check(not await zone.test_tone(), "test tone: refused while AirPlay plays")
+
+    # speaker turned almost all the way down: tone at 40 %, then back
+    side = FakeSide({"A": 3})
+    zone = bridge.Zone(
+        bridge.zone_config(0, {"name": "L", "host": "A", "port": 1}), side, OPTS
+    )
+    zone.links[0].client_id = "id"
+    check(await zone.test_tone(), "test tone: played at low volume")
+    check(
+        side.players["A"].history == [bridge.TONE_MIN_VOLUME, 3],
+        "test tone: quiet speaker raised to 40 %, then restored",
+    )
 
 
 async def test_stats():
@@ -585,7 +667,9 @@ async def test_timing_steady():
     times = [c[0] for c in commits]
     sizes = [len(c[1]) // bridge.CHUNK_BYTES for c in commits]
     # consecutive commits continue exactly where the previous one ended
-    gaps = [t2 - (t1 + n * bridge.CHUNK_US) for t1, t2, n in zip(times, times[1:], sizes)]
+    gaps = [
+        t2 - (t1 + n * bridge.CHUNK_US) for t1, t2, n in zip(times, times[1:], sizes)
+    ]
     check(max(abs(g) for g in gaps) <= 300, "timing: commits are contiguous")
     check(zone.stats["resyncs"] == 0, "timing: no restarts in a steady stream")
 
