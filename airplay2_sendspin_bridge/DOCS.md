@@ -120,6 +120,7 @@ zones:
 | `report_model` | Meldet AirPlay das echte Modell und den Hersteller (z. B. „Echo 2“ von Amazon) statt „ShairportSync“ (Standard an). Ändert das Symbol nicht. |
 | `airplay_icon` | Symbol im AirPlay-Menü: `standard` oder als Experiment `airport_express` (siehe unten). |
 | `icon_model`, `icon_manufacturer` | Experiment: freie Modellkennung und Hersteller für alle Lautsprecher (gilt vor `airplay_icon`). |
+| `device_id_style` | Experiment: `local` (Standard) oder `vendor` – Geräte-ID mit Amazon-Herstellerkennung. |
 | `zones[].speaker_volume` | AirPlay-Lautstärke dieses Lautsprechers in %, überschreibt `speaker_volume`. |
 | `zones[].night_volume`, `night_start`, `night_end` | Nachtmodus: zwischen Start und Ende höchstens so viel % (z. B. 40, 22:00, 07:00). |
 
@@ -263,12 +264,11 @@ Amazon, Option `report_model`) ändert am Symbol also nichts, auch nicht die
 Home-App (getestet). **Ergebnis der Tests (0.9.3–0.9.5):** Auch fremde
 Kennungen ändern nichts – weder die einer AirPort Express noch exakt die
 einer Sonos Roam 2 samt Hersteller, die im selben Netz das Box-Symbol hat.
-Beobachtet: Klassische AirPlay-1-Empfänger (z. B. TECHO5 ohne AirPlay 2)
-zeigt iOS als Box, AirPlay-2-Empfänger mit shairport-sync immer mit Wellen.
-Das Box-Symbol gäbe es also nur mit AirPlay 1 – dann aber ohne synchrone
-Gruppen mit HomePod und Sonos, den Kern dieser Bridge. Die Optionen
-`airplay_icon`, `icon_model` und `icon_manufacturer` bleiben für eigene
-Versuche, haben nach bisherigem Stand aber keine Wirkung.
+TECHO5 (unverändertes shairport-sync direkt auf dem Echo, auch mit AirPlay 2)
+bekam dagegen Box-Symbole. Ein Unterschied ist die Geräte-ID: dort die echte
+MAC des Echos, hier eine künstliche. Experiment dazu: `device_id_style:
+vendor` (ID mit Amazon-Herstellerkennung). Die Optionen `airplay_icon`,
+`icon_model` und `icon_manufacturer` haben nach bisherigem Stand keine Wirkung.
 
 **Test-Ton:** Der ♪-Knopf auf der Kachel spielt direkt über das Add-on einen
 kurzen Ton auf dem Echo, ohne iPhone und AirPlay – zum Prüfen von Kopplung und
@@ -405,6 +405,7 @@ edited there by hand.
 | `report_model` | Tells AirPlay the real model and manufacturer (e.g. "Echo 2" by Amazon) instead of "ShairportSync" (default on). Does not change the icon. |
 | `airplay_icon` | Icon in the AirPlay menu: `standard` or, as an experiment, `airport_express` (see below). |
 | `icon_model`, `icon_manufacturer` | Experiment: any model identifier and manufacturer for all speakers (wins over `airplay_icon`). |
+| `device_id_style` | Experiment: `local` (default) or `vendor` – device ID with Amazon's manufacturer prefix. |
 | `zones[].speaker_volume` | AirPlay volume of this speaker in %, overrides `speaker_volume`. |
 | `zones[].night_volume`, `night_start`, `night_end` | Night mode: at most this % between start and end (e.g. 40, 22:00, 07:00). |
 
@@ -543,12 +544,11 @@ speaker with waves. iOS does not know Echos – reporting the real model ("Echo
 does the Home app (tested). **Test results (0.9.3–0.9.5):** other identifiers
 change nothing either – neither an AirPort Express identifier nor exactly
 that of a Sonos Roam 2 including manufacturer, which gets the box icon on the
-same network. Observed: classic AirPlay 1 receivers (e.g. TECHO5 without
-AirPlay 2) show up as a box, AirPlay 2 receivers with shairport-sync always
-with waves. The box icon would therefore only come with AirPlay 1 – but then
-without synchronised groups with HomePod and Sonos, the point of this bridge.
-The options `airplay_icon`, `icon_model` and `icon_manufacturer` stay for
-your own experiments but have shown no effect so far.
+same network. TECHO5 (unmodified shairport-sync on the Echo itself, also with
+AirPlay 2) did get box icons. One difference is the device ID: there the
+Echo's real MAC, here an artificial one. Experiment: `device_id_style:
+vendor` (ID with Amazon's manufacturer prefix). The options `airplay_icon`,
+`icon_model` and `icon_manufacturer` have shown no effect so far.
 
 **Test tone:** The ♪ button on the tile plays a short tone on the Echo
 straight from the add-on, without iPhone or AirPlay – to check pairing and IP.

@@ -1,12 +1,17 @@
 # Changelog
 
+## 0.9.7
+
+- Icon experiment: option `device_id_style: vendor` gives each speaker a
+  device ID with Amazon's manufacturer prefix (like an Echo's real MAC)
+  instead of a locally administered one. TECHO5, which runs unmodified
+  shairport-sync with the Echo's real MAC, showed box icons.
+
 ## 0.9.6
 
 - Docs: result of the icon tests – neither the real model, an AirPort
   Express identifier nor exactly a Sonos Roam 2 identifier changes the icon
-  in the iOS AirPlay menu. Observed: classic AirPlay 1 receivers show as a
-  box, AirPlay 2 receivers with shairport-sync always with waves. The
-  experiment options stay, without effect.
+  in the iOS AirPlay menu. The experiment options stay, without effect.
 
 ## 0.9.5
 
