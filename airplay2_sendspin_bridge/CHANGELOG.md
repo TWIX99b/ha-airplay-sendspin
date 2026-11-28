@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.6
+
+- Docs: result of the icon tests – neither the real model, an AirPort
+  Express identifier nor exactly a Sonos Roam 2 identifier changes the icon
+  in the iOS AirPlay menu. iOS apparently gives product icons only to
+  Apple-certified (MFi) devices. The experiment options stay, without effect.
+
 ## 0.9.5
 
 - Icon experiment: options `icon_model` and `icon_manufacturer` report any

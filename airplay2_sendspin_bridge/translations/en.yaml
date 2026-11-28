@@ -49,9 +49,9 @@ configuration:
     name: Icon in the AirPlay menu (experiment)
     description: >-
       "standard" = speaker with waves. "airport_express" reports an AirPort
-      Express identifier for all speakers, whose icon iOS knows. Only the
-      icon, no other features; iOS sometimes shows the standard icon again
-      after connecting. Takes effect after a restart.
+      Express identifier for all speakers. Tested without effect: iOS
+      apparently gives icons only to certified devices. Takes effect after a
+      restart.
   icon_model:
     name: Own model identifier (experiment)
     description: >-
