@@ -9,6 +9,14 @@
   title of its track; the new title then wiped it again, so HA and the Echo
   Show often showed no cover. A cover from the last 5 seconds is now kept.
   The log says "Cover received (… KB)".
+- **Night mode / volume changes did not apply while playing:** the Echo
+  reports its volume in its own steps (e.g. 62 after being set to 60), which
+  the bridge took for a change by hand and then left the volume alone.
+  Settings changed on the page or in HA now always apply at once; only the
+  automatic switch at the start/end of the night respects a real change by
+  hand (more than 5 %), and logs it.
+- Edit dialog: the volume trim kept only whole/half dB (−8.8 became −8.0);
+  now 0.1 dB.
 
 ## 0.9.1
 

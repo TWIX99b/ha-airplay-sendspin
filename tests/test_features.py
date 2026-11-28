@@ -547,6 +547,41 @@ async def test_follow_night():
     await zone._give_volume_back(link)
     check(side.players["A"].volume == 30, "night: old volume back after session")
 
+    # the Echo reports its own rounding (60 → 62): settings still apply
+    zone._take_volume(link)
+    zone.apply_settings(
+        {
+            "speaker_volume": 60,
+            "night_volume": 30,
+            "night_start": "00:00",
+            "night_end": "00:00",
+        }
+    )
+    check(side.players["A"].volume == 60, "night: per-speaker 60 applied")
+    side.players["A"].volume = 62  # speaker's own steps
+    zone.apply_settings(
+        {
+            "speaker_volume": 60,
+            "night_volume": 30,
+            "night_start": "00:00",
+            "night_end": "23:59",
+        }
+    )
+    check(side.players["A"].volume == 30, "night: applies despite speaker rounding")
+    # automatic switch respects a real change by hand
+    zone.apply_settings(
+        {
+            "speaker_volume": 60,
+            "night_volume": 30,
+            "night_start": "00:00",
+            "night_end": "00:00",
+        }
+    )
+    side.players["A"].volume = 85  # turned up by hand
+    zone.cfg.night_end = "23:59"
+    zone._follow_target()
+    check(side.players["A"].volume == 85, "night: automatic switch keeps a hand change")
+
 
 async def test_tone_pair():
     cfg = bridge.zone_config(
