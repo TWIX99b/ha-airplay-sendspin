@@ -54,8 +54,8 @@ configuration:
     description: >-
       „standard“ = Lautsprecher mit Wellen. „airport_express“ meldet allen
       Lautsprechern die Kennung einer AirPort Express, deren Symbol iOS kennt.
-      Getestet ohne Wirkung: iOS vergibt Symbole offenbar nur an zertifizierte
-      Geräte. Wirkt nach einem Neustart.
+      Getestet ohne Wirkung: AirPlay-2-Empfänger zeigt iOS immer mit Wellen.
+      Wirkt nach einem Neustart.
   icon_model:
     name: Eigene Modellkennung (Experiment)
     description: >-

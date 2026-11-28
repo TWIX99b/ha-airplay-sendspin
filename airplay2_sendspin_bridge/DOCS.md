@@ -263,10 +263,12 @@ Amazon, Option `report_model`) ändert am Symbol also nichts, auch nicht die
 Home-App (getestet). **Ergebnis der Tests (0.9.3–0.9.5):** Auch fremde
 Kennungen ändern nichts – weder die einer AirPort Express noch exakt die
 einer Sonos Roam 2 samt Hersteller, die im selben Netz das Box-Symbol hat.
-iOS vergibt Produktsymbole offenbar nur an von Apple zertifizierte Geräte
-(MFi), das kann shairport-sync nicht. Die Optionen `airplay_icon`,
-`icon_model` und `icon_manufacturer` bleiben für eigene Versuche, haben aber
-nach bisherigem Stand keine Wirkung.
+Beobachtet: Klassische AirPlay-1-Empfänger (z. B. TECHO5 ohne AirPlay 2)
+zeigt iOS als Box, AirPlay-2-Empfänger mit shairport-sync immer mit Wellen.
+Das Box-Symbol gäbe es also nur mit AirPlay 1 – dann aber ohne synchrone
+Gruppen mit HomePod und Sonos, den Kern dieser Bridge. Die Optionen
+`airplay_icon`, `icon_model` und `icon_manufacturer` bleiben für eigene
+Versuche, haben nach bisherigem Stand aber keine Wirkung.
 
 **Test-Ton:** Der ♪-Knopf auf der Kachel spielt direkt über das Add-on einen
 kurzen Ton auf dem Echo, ohne iPhone und AirPlay – zum Prüfen von Kopplung und
@@ -541,10 +543,12 @@ speaker with waves. iOS does not know Echos – reporting the real model ("Echo
 does the Home app (tested). **Test results (0.9.3–0.9.5):** other identifiers
 change nothing either – neither an AirPort Express identifier nor exactly
 that of a Sonos Roam 2 including manufacturer, which gets the box icon on the
-same network. iOS apparently gives product icons only to Apple-certified
-devices (MFi), which shairport-sync cannot be. The options `airplay_icon`,
-`icon_model` and `icon_manufacturer` stay for your own experiments but have
-shown no effect so far.
+same network. Observed: classic AirPlay 1 receivers (e.g. TECHO5 without
+AirPlay 2) show up as a box, AirPlay 2 receivers with shairport-sync always
+with waves. The box icon would therefore only come with AirPlay 1 – but then
+without synchronised groups with HomePod and Sonos, the point of this bridge.
+The options `airplay_icon`, `icon_model` and `icon_manufacturer` stay for
+your own experiments but have shown no effect so far.
 
 **Test tone:** The ♪ button on the tile plays a short tone on the Echo
 straight from the add-on, without iPhone or AirPlay – to check pairing and IP.
