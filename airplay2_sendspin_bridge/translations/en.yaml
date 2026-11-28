@@ -42,8 +42,16 @@ configuration:
     name: Report the real model
     description: >-
       Tells AirPlay the real model and manufacturer (e.g. "Echo 2" by Amazon)
-      instead of "ShairportSync". iOS picks the icon in the AirPlay menu from
-      it. Takes effect after a restart.
+      instead of "ShairportSync", shown in the log and on the page. It does not
+      change the icon in the AirPlay menu (iOS does not know Echos). Takes
+      effect after a restart.
+  airplay_icon:
+    name: Icon in the AirPlay menu (experiment)
+    description: >-
+      "standard" = speaker with waves. "airport_express" reports an AirPort
+      Express identifier for all speakers, whose icon iOS knows. Only the
+      icon, no other features; iOS sometimes shows the standard icon again
+      after connecting. Takes effect after a restart.
   metadata:
     name: Pass on title and cover
     description: >-

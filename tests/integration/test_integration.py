@@ -107,6 +107,7 @@ async def test_entities_and_push(hass: HomeAssistant, addon) -> None:
     cover = eid(hass, "image", "wohnzimmer_echo_cover")
     eid(hass, "button", "wohnzimmer_echo_test_tone")
     eid(hass, "number", "wohnzimmer_echo_trim")
+    volume_now = eid(hass, "sensor", "wohnzimmer_echo_volume_now")
 
     assert hass.states.get(playing).state == STATE_OFF
     assert float(hass.states.get(offset).state) == -225
@@ -128,6 +129,15 @@ async def test_entities_and_push(hass: HomeAssistant, addon) -> None:
     assert state.state == "Bohemian Rhapsody"
     assert state.attributes["artist"] == "Queen"
     assert hass.states.get(dropouts).state == "2"
+    assert hass.states.get(volume_now).state == "100"  # day value
+    zone.update(speaker_volume_target=40, night_active=True, speaker_volume=41)
+    await addon.push()
+    await hass.async_block_till_done()
+    now_state = hass.states.get(volume_now)
+    assert now_state.state == "40"  # night value, while the day setting stays
+    assert now_state.attributes["night_active"] is True
+    assert now_state.attributes["echo_volume"] == 41
+    assert float(hass.states.get(volume).state) == 100
     image = hass.data["image"].get_entity(cover)
     assert await image.async_image() == COVER
 

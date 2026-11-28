@@ -117,7 +117,8 @@ zones:
 | `metadata` | Titel, Interpret, Album und Cover weitergeben (Standard an). |
 | `zones[].satellite_entity` | Sprachassistent des Lautsprechers (`assist_satellite.*`). Leer = automatisch über `token_entity`. |
 | `zones[].partner_host` usw. | Zweiter Lautsprecher als Stereo-Paar, siehe unten. |
-| `report_model` | Meldet AirPlay das echte Modell und den Hersteller (z. B. „Echo 2“ von Amazon) statt „ShairportSync“ (Standard an). |
+| `report_model` | Meldet AirPlay das echte Modell und den Hersteller (z. B. „Echo 2“ von Amazon) statt „ShairportSync“ (Standard an). Ändert das Symbol nicht. |
+| `airplay_icon` | Symbol im AirPlay-Menü: `standard` oder als Experiment `airport_express` (siehe unten). |
 | `zones[].speaker_volume` | AirPlay-Lautstärke dieses Lautsprechers in %, überschreibt `speaker_volume`. |
 | `zones[].night_volume`, `night_start`, `night_end` | Nachtmodus: zwischen Start und Ende höchstens so viel % (z. B. 40, 22:00, 07:00). |
 
@@ -229,7 +230,8 @@ Satellit“), gleich neben Sprachassistent und Media Player:
 | AirPlay | an, solange über AirPlay gespielt wird |
 | AirPlay-Titel | Titel, Interpret und Album als Attribute |
 | AirPlay-Cover | Cover des laufenden Titels (Bild) |
-| AirPlay-Lautstärke | Lautstärke des Echos bei AirPlay (%), sofort wirksam |
+| AirPlay-Lautstärke (Tag) | Lautstärke des Echos bei AirPlay (%), sofort wirksam |
+| AirPlay-Lautstärke jetzt | Was gerade gilt: Tag- oder Nachtwert (%) |
 | AirPlay-Nachtmodus | Nachtmodus an/aus (Zeiten und Wert auf der Add-on-Seite) |
 | AirPlay-Test-Ton | Knopf: kurzer Ton auf dem Echo |
 | AirPlay-Versatz, AirPlay-Lautstärke-Anpassung | Einstellungen, sofort wirksam und gespeichert |
@@ -253,14 +255,13 @@ Abfrage-Intervall. Ein MQTT-Broker ist nicht mehr nötig.
 
 ### Symbol, Test-Ton, Verbindung, Nachtmodus
 
-**Symbol im AirPlay-Menü:** iOS wählt das Symbol nach dem gemeldeten Modell
-und Hersteller. shairport-sync meldet von Haus aus immer „ShairportSync“; das
-Add-on baut es so, dass jeder Lautsprecher sein echtes Modell meldet, das es
-aus HA liest (z. B. „Echo 2“ von Amazon) – so wie eine Sonos „One“ von
-„Sonos“ meldet. Welches Symbol iOS dann zeigt, entscheidet iOS. Ein
-Apple-Modell wird bewusst nicht vorgetäuscht. Zusätzlich lassen sich die
-Lautsprecher in die Apple-Home-App aufnehmen (Home → + → Gerät hinzufügen →
-Weitere Optionen) und einem Raum zuordnen.
+**Symbol im AirPlay-Menü:** iOS zeigt nur für Modellkennungen, die es kennt,
+ein eigenes Symbol (Apple-Geräte, Sonos …); für alle anderen den Lautsprecher
+mit Wellen. Echos kennt iOS nicht – das gemeldete echte Modell („Echo 2“ von
+Amazon, Option `report_model`) ändert am Symbol also nichts, auch nicht die
+Home-App (getestet). Als **Experiment** meldet die Option `airplay_icon:
+airport_express` stattdessen die Kennung einer AirPort Express. Das betrifft
+nur das Symbol; iOS zeigt nach dem Verbinden teils wieder das Standardsymbol.
 
 **Test-Ton:** Der ♪-Knopf auf der Kachel spielt direkt über das Add-on einen
 kurzen Ton auf dem Echo, ohne iPhone und AirPlay – zum Prüfen von Kopplung und
@@ -394,7 +395,8 @@ edited there by hand.
 | `metadata` | Pass on title, artist, album and cover (default on). |
 | `zones[].satellite_entity` | The speaker's voice assistant (`assist_satellite.*`). Empty = found via `token_entity`. |
 | `zones[].partner_host` etc. | Second speaker as a stereo pair, see below. |
-| `report_model` | Tells AirPlay the real model and manufacturer (e.g. "Echo 2" by Amazon) instead of "ShairportSync" (default on). |
+| `report_model` | Tells AirPlay the real model and manufacturer (e.g. "Echo 2" by Amazon) instead of "ShairportSync" (default on). Does not change the icon. |
+| `airplay_icon` | Icon in the AirPlay menu: `standard` or, as an experiment, `airport_express` (see below). |
 | `zones[].speaker_volume` | AirPlay volume of this speaker in %, overrides `speaker_volume`. |
 | `zones[].night_volume`, `night_start`, `night_end` | Night mode: at most this % between start and end (e.g. 40, 22:00, 07:00). |
 
@@ -501,7 +503,8 @@ satellite"), next to the voice assistant and media player:
 | AirPlay | on while playing via AirPlay |
 | AirPlay title | title, artist and album as attributes |
 | AirPlay cover | cover of the current track (image) |
-| AirPlay volume | the Echo's volume during AirPlay (%), immediate |
+| AirPlay volume (day) | the Echo's volume during AirPlay (%), immediate |
+| AirPlay volume now | what applies right now: day or night value (%) |
 | AirPlay night mode | night mode on/off (times and value on the add-on page) |
 | AirPlay test tone | button: short tone on the Echo |
 | AirPlay sync offset, AirPlay volume trim | settings, immediate and saved |
@@ -525,13 +528,13 @@ Settings → MQTT → Devices; switch automations to the new entities.
 
 ### Icon, test tone, connection, night mode
 
-**Icon in the AirPlay menu:** iOS picks the icon from the reported model and
-manufacturer. shairport-sync always reports "ShairportSync"; the add-on builds
-it so that each speaker reports its real model, read from HA (e.g. "Echo 2" by
-Amazon) – just as a Sonos reports "One" by "Sonos". Which icon iOS then shows
-is up to iOS. An Apple model is deliberately not faked. The speakers can also
-be added to the Apple Home app (Home → + → Add Accessory → More options) and
-assigned to a room.
+**Icon in the AirPlay menu:** iOS only shows a specific icon for model
+identifiers it knows (Apple devices, Sonos …); everything else gets the
+speaker with waves. iOS does not know Echos – reporting the real model ("Echo
+2" by Amazon, option `report_model`) does not change the icon, and neither
+does the Home app (tested). As an **experiment**, the option `airplay_icon:
+airport_express` reports an AirPort Express identifier instead. This only
+affects the icon; iOS sometimes shows the standard icon again after connecting.
 
 **Test tone:** The ♪ button on the tile plays a short tone on the Echo
 straight from the add-on, without iPhone or AirPlay – to check pairing and IP.

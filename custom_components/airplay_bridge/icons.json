@@ -12,6 +12,9 @@
       "track": {
         "default": "mdi:music"
       },
+      "volume_now": {
+        "default": "mdi:volume-medium"
+      },
       "dropouts": {
         "default": "mdi:wifi-alert"
       }

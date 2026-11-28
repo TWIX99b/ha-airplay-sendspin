@@ -46,8 +46,16 @@ configuration:
     name: Echtes Modell melden
     description: >-
       Meldet AirPlay das echte Modell und den Hersteller (z. B. „Echo 2“ von
-      Amazon) statt „ShairportSync“. iOS wählt danach das Symbol im
-      AirPlay-Menü. Wirkt nach einem Neustart.
+      Amazon) statt „ShairportSync“, sichtbar in Log und Seite. Das Symbol im
+      AirPlay-Menü ändert das nicht (iOS kennt Echos nicht). Wirkt nach einem
+      Neustart.
+  airplay_icon:
+    name: Symbol im AirPlay-Menü (Experiment)
+    description: >-
+      „standard“ = Lautsprecher mit Wellen. „airport_express“ meldet allen
+      Lautsprechern die Kennung einer AirPort Express, deren Symbol iOS kennt.
+      Nur das Symbol, keine weiteren Funktionen; iOS zeigt nach dem Verbinden
+      teils wieder das Standardsymbol. Wirkt nach einem Neustart.
   metadata:
     name: Titel und Cover weitergeben
     description: >-
