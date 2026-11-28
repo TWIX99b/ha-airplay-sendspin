@@ -260,9 +260,13 @@ Abfrage-Intervall. Ein MQTT-Broker ist nicht mehr nötig.
 ein eigenes Symbol (Apple-Geräte, Sonos …); für alle anderen den Lautsprecher
 mit Wellen. Echos kennt iOS nicht – das gemeldete echte Modell („Echo 2“ von
 Amazon, Option `report_model`) ändert am Symbol also nichts, auch nicht die
-Home-App (getestet). Als **Experiment** meldet die Option `airplay_icon:
-airport_express` stattdessen die Kennung einer AirPort Express. Das betrifft
-nur das Symbol; iOS zeigt nach dem Verbinden teils wieder das Standardsymbol.
+Home-App (getestet). **Ergebnis der Tests (0.9.3–0.9.5):** Auch fremde
+Kennungen ändern nichts – weder die einer AirPort Express noch exakt die
+einer Sonos Roam 2 samt Hersteller, die im selben Netz das Box-Symbol hat.
+iOS vergibt Produktsymbole offenbar nur an von Apple zertifizierte Geräte
+(MFi), das kann shairport-sync nicht. Die Optionen `airplay_icon`,
+`icon_model` und `icon_manufacturer` bleiben für eigene Versuche, haben aber
+nach bisherigem Stand keine Wirkung.
 
 **Test-Ton:** Der ♪-Knopf auf der Kachel spielt direkt über das Add-on einen
 kurzen Ton auf dem Echo, ohne iPhone und AirPlay – zum Prüfen von Kopplung und
@@ -534,9 +538,13 @@ Settings → MQTT → Devices; switch automations to the new entities.
 identifiers it knows (Apple devices, Sonos …); everything else gets the
 speaker with waves. iOS does not know Echos – reporting the real model ("Echo
 2" by Amazon, option `report_model`) does not change the icon, and neither
-does the Home app (tested). As an **experiment**, the option `airplay_icon:
-airport_express` reports an AirPort Express identifier instead. This only
-affects the icon; iOS sometimes shows the standard icon again after connecting.
+does the Home app (tested). **Test results (0.9.3–0.9.5):** other identifiers
+change nothing either – neither an AirPort Express identifier nor exactly
+that of a Sonos Roam 2 including manufacturer, which gets the box icon on the
+same network. iOS apparently gives product icons only to Apple-certified
+devices (MFi), which shairport-sync cannot be. The options `airplay_icon`,
+`icon_model` and `icon_manufacturer` stay for your own experiments but have
+shown no effect so far.
 
 **Test tone:** The ♪ button on the tile plays a short tone on the Echo
 straight from the add-on, without iPhone or AirPlay – to check pairing and IP.
