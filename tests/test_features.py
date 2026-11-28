@@ -300,6 +300,35 @@ def test_metadata():
     check(same == [], "metadata: unchanged block → no update")
     check(p.feed(meta_item("ssnc", "pend")) == [None], "metadata: end → None")
 
+    # AirPlay 2: the cover often comes BEFORE the title block of its track
+    now = [100.0]
+    p = metadata.MetadataParser(clock=lambda: now[0])
+
+    def block(title):
+        return (
+            meta_item("ssnc", "mdst")
+            + meta_item("core", "minm", title.encode())
+            + meta_item("core", "asar", b"Band")
+            + meta_item("ssnc", "mden")
+        )
+
+    ups = p.feed(meta_item("ssnc", "PICT", b"\xff\xd8cover1") + block("Eins"))
+    check(
+        ups[-1].title == "Eins" and ups[-1].cover == b"\xff\xd8cover1",
+        "metadata: cover before title is kept",
+    )
+    now[0] += 200  # next track, its cover only comes later
+    ups = p.feed(block("Zwei"))
+    check(
+        ups[-1].title == "Zwei" and ups[-1].cover is None,
+        "metadata: old cover not shown for the next title",
+    )
+    ups = p.feed(meta_item("ssnc", "PICT", b"\xff\xd8cover2"))
+    check(ups[-1].cover == b"\xff\xd8cover2", "metadata: late cover arrives")
+    now[0] += 1  # third track: cover first, title right after
+    ups = p.feed(meta_item("ssnc", "PICT", b"\xff\xd8cover3") + block("Drei"))
+    check(ups[-1].cover == b"\xff\xd8cover3", "metadata: cover-first again")
+
 
 def test_zone_state():
     import web

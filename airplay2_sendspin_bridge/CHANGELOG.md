@@ -5,6 +5,10 @@
 - **Test tone always audible:** if the speaker is turned down below 40 %,
   the test tone (page ♪ and HA button) plays at 40 % and the old volume is
   restored afterwards. Before, a speaker at 3 % played it inaudibly.
+- **Cover fixed:** with AirPlay 2 the cover often arrives just *before* the
+  title of its track; the new title then wiped it again, so HA and the Echo
+  Show often showed no cover. A cover from the last 5 seconds is now kept.
+  The log says "Cover received (… KB)".
 
 ## 0.9.1
 

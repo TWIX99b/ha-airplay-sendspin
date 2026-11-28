@@ -715,9 +715,12 @@ class Zone:
             info = None
         if info == self.track:
             return
+        old_cover = self.track.cover if self.track else None
         self.track = info
         if info is not None:
             self.log.info("Now playing: %s – %s", info.artist, info.title)
+            if info.cover and info.cover != old_cover:
+                self.log.info("Cover received (%d KB)", len(info.cover) // 1024)
         if self.streaming:
             asyncio.ensure_future(self._push_track(self.active))
         self._notify()
