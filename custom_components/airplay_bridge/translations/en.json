@@ -50,6 +50,17 @@
           }
         }
       },
+      "volume_now": {
+        "name": "AirPlay volume now",
+        "state_attributes": {
+          "night_active": {
+            "name": "Night mode active"
+          },
+          "echo_volume": {
+            "name": "Volume on the Echo"
+          }
+        }
+      },
       "dropouts": {
         "name": "AirPlay dropouts",
         "state_attributes": {
@@ -70,7 +81,7 @@
         "name": "AirPlay volume trim"
       },
       "airplay_volume": {
-        "name": "AirPlay volume"
+        "name": "AirPlay volume (day)"
       }
     },
     "switch": {

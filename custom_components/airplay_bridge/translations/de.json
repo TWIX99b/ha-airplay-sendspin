@@ -50,6 +50,17 @@
           }
         }
       },
+      "volume_now": {
+        "name": "AirPlay-Lautstärke jetzt",
+        "state_attributes": {
+          "night_active": {
+            "name": "Nachtmodus aktiv"
+          },
+          "echo_volume": {
+            "name": "Lautstärke am Echo"
+          }
+        }
+      },
       "dropouts": {
         "name": "AirPlay-Aussetzer",
         "state_attributes": {
@@ -70,7 +81,7 @@
         "name": "AirPlay-Lautstärke-Anpassung"
       },
       "airplay_volume": {
-        "name": "AirPlay-Lautstärke"
+        "name": "AirPlay-Lautstärke (Tag)"
       }
     },
     "switch": {

@@ -94,7 +94,11 @@ TONE_LEAD_US = 400_000
 # The speaker reports its volume in its own steps (60 → 62): only a bigger
 # difference counts as "someone turned it by hand".
 VOLUME_TOLERANCE = 5
-TONE_MIN_VOLUME = 40  # a test tone at 3 % is no test: at least this loud
+TONE_MIN_VOLUME = 40
+# Model identifiers iOS has a built-in icon for (option airplay_icon)
+ICON_MODELS = {
+    "airport_express": "AirPort10,115"
+}  # a test tone at 3 % is no test: at least this loud
 MANUFACTURERS = {"echo": "Amazon"}  # model prefix → manufacturer if HA has none
 PCM_FORMAT = AudioFormat(sample_rate=SAMPLE_RATE, bit_depth=16, channels=CHANNELS)
 
@@ -490,6 +494,7 @@ class Zone:
         # Speaker volume while AirPlay plays (0 = leave it alone)
         self.default_volume = int(opts.get("speaker_volume", 100))
         self.report_model = bool(opts.get("report_model", True))
+        self.airplay_icon = str(opts.get("airplay_icon") or "standard")
         self.model = ""  # reported to AirPlay (icon), e.g. "Echo 2"
         self.manufacturer = ""
         self._session_lock = asyncio.Lock()
@@ -876,7 +881,11 @@ class Zone:
             cmd.append("-v")
         self.log.info("Starting AirPlay zone '%s' (%s)", self.cfg.name, " ".join(cmd))
         env = dict(os.environ)
-        if self.model:  # read by the patched shairport-sync (icon in iOS)
+        borrowed = ICON_MODELS.get(self.airplay_icon)
+        if borrowed:  # experiment: an identifier iOS has an icon for
+            env["SPS_MODEL"] = borrowed
+            self.log.info("AirPlay reports model '%s' (icon experiment)", borrowed)
+        elif self.model:  # read by the patched shairport-sync
             env["SPS_MODEL"] = self.model
             env["SPS_MANUFACTURER"] = self.manufacturer
         proc = await asyncio.create_subprocess_exec(

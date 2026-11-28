@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.3
+
+- **HA: "AirPlay volume now"** (new sensor): the volume AirPlay uses right
+  now – the night value while night mode is active. The number entity is
+  now called "AirPlay volume (day)", because it is the day setting.
+- HA: volume trim adjustable in 0.1 dB steps.
+- **Icon experiment:** option `airplay_icon` (`standard` /
+  `airport_express`). iOS only has icons for model identifiers it knows;
+  "Echo 2" is not one of them, so `report_model` never changed the icon
+  (the docs said otherwise – corrected).
+
 ## 0.9.2
 
 - **Test tone always audible:** if the speaker is turned down below 40 %,
