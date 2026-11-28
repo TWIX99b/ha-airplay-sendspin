@@ -305,10 +305,9 @@ def load_token() -> str:
 async def announce_to_ha(token: str) -> None:
     """Tell Home Assistant about us: it offers to set up the integration."""
     log.info(
-        "HA integration: normally found automatically. Manual setup: "
-        "host 127.0.0.1, port %d, token %s",
+        "HA integration: normally found automatically. Manual setup: host "
+        '127.0.0.1, port %d, token on the add-on page (bottom, "Home Assistant")',
         INGRESS_PORT,
-        token,
     )
     sup = os.environ.get("SUPERVISOR_TOKEN")
     if not sup:
@@ -461,6 +460,11 @@ def create_app(zones: list[Zone], token: str = "") -> web.Application:
         return web.json_response(
             {
                 "boot": BOOT_ID,
+                "integration": {
+                    "host": "127.0.0.1",
+                    "port": INGRESS_PORT,
+                    "token": token,
+                },
                 "ip_conflict": read_ip_conflict(),
                 "zones": [speakers.public_zone(z) for z in opts.get("zones", [])],
             }

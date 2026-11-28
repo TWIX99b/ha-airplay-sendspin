@@ -132,6 +132,13 @@
 
   <section id="tabSpk">
     <div class="grid" id="tiles"></div>
+    <details class="card" id="intBox" style="margin-top:16px">
+      <summary data-t="intTitle"></summary>
+      <p class="muted" data-t="intText"></p>
+      <p><span data-t="intHost"></span> <code>127.0.0.1</code> · <span data-t="intPort"></span> <code id="intPort"></code></p>
+      <p><span data-t="intToken"></span> <code id="intToken" style="word-break:break-all"></code>
+        <button class="sec" id="intCopy" data-t="copy"></button></p>
+    </details>
   </section>
 
   <section id="tabCal" hidden>
@@ -370,6 +377,9 @@ const T = DE ? {
   addManual: 'Von Hand eintragen', cancel: 'Abbrechen',
   noneFound: 'Keine Echos mit echo-dot-assist in Home Assistant gefunden.',
   already: 'schon eingerichtet', noToken: 'Token noch leer – ist der Echo erreichbar?',
+  intTitle: 'Home Assistant – Integration von Hand einrichten',
+  intText: 'Normalerweise findet Home Assistant das Add-on von selbst („AirPlay Bridge gefunden“). Nur falls nicht: Integration „AirPlay Bridge“ hinzufügen und diese Werte eintragen. Den Token nicht weitergeben.',
+  intHost: 'Adresse', intPort: 'Port', intToken: 'Token', copy: 'Kopieren', copied: 'Kopiert.',
   ipTitle: 'IP-Adresse für AirPlay ist nicht frei',
   ipHost: (ip) => `${ip} ist eine Adresse des HA-Hosts selbst. Trag unter Konfiguration → ap2_ip eine freie IP ein und starte das Add-on neu.`,
   ipUsed: (ip, mac) => `Auf ${ip} hat beim Start schon ein anderes Gerät geantwortet (MAC ${mac}). AirPlay funktioniert so nicht zuverlässig. Trag unter Konfiguration → ap2_ip eine freie IP ein und starte das Add-on neu.`,
@@ -492,6 +502,9 @@ const T = DE ? {
   addManual: 'Enter manually', cancel: 'Cancel',
   noneFound: 'No Echos with echo-dot-assist found in Home Assistant.',
   already: 'already set up', noToken: 'token still empty – is the Echo online?',
+  intTitle: 'Home Assistant – set up the integration by hand',
+  intText: 'Normally Home Assistant finds the add-on by itself ("AirPlay Bridge discovered"). Only if not: add the integration "AirPlay Bridge" and enter these values. Do not share the token.',
+  intHost: 'Host', intPort: 'Port', intToken: 'Token', copy: 'Copy', copied: 'Copied.',
   ipTitle: 'The AirPlay IP address is not free',
   ipHost: (ip) => `${ip} is an address of the HA host itself. Enter a free IP under Configuration → ap2_ip and restart the add-on.`,
   ipUsed: (ip, mac) => `Another device answered on ${ip} at start (MAC ${mac}). AirPlay will not work reliably. Enter a free IP under Configuration → ap2_ip and restart the add-on.`,
@@ -692,6 +705,7 @@ document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.close
 async function loadConfig() {
   try {
     const j = await (await fetch('api/config')).json(); cfg = j.zones || []; boot = j.boot;
+    if (j.integration) { $('intPort').textContent = j.integration.port; $('intToken').textContent = j.integration.token; }
     const c = j.ip_conflict;
     $('ipWarn').hidden = !c;
     if (c) $('ipWarn').innerHTML = `<b class="warn">⚠ ${esc(T.ipTitle)}</b><p>${esc(c.by === 'host' ? T.ipHost(c.ip) : T.ipUsed(c.ip, c.by))}</p>`;
@@ -1300,6 +1314,10 @@ async function saveOffset(value) {
   $('earMsg').textContent = msg;
   return j;
 }
+$('intCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText($('intToken').textContent); toast(T.copied); }
+  catch (e) { getSelection().selectAllChildren($('intToken')); }
+};
 $('start').onclick = () => measure();
 $('again').onclick = () => measure();
 $('cancel').onclick = () => { if (measuring) measuring.cancel = true; };
