@@ -495,6 +495,9 @@ class Zone:
         self.default_volume = int(opts.get("speaker_volume", 100))
         self.report_model = bool(opts.get("report_model", True))
         self.airplay_icon = str(opts.get("airplay_icon") or "standard")
+        # free experiment: any model identifier / manufacturer (wins over all)
+        self.icon_model = str(opts.get("icon_model") or "").strip()[:64]
+        self.icon_manufacturer = str(opts.get("icon_manufacturer") or "").strip()[:64]
         self.model = ""  # reported to AirPlay (icon), e.g. "Echo 2"
         self.manufacturer = ""
         self._session_lock = asyncio.Lock()
@@ -882,7 +885,15 @@ class Zone:
         self.log.info("Starting AirPlay zone '%s' (%s)", self.cfg.name, " ".join(cmd))
         env = dict(os.environ)
         borrowed = ICON_MODELS.get(self.airplay_icon)
-        if borrowed:  # experiment: an identifier iOS has an icon for
+        if self.icon_model:  # experiment with any identifier
+            env["SPS_MODEL"] = self.icon_model
+            env["SPS_MANUFACTURER"] = self.icon_manufacturer
+            self.log.info(
+                "AirPlay reports model '%s' by '%s' (icon experiment)",
+                self.icon_model,
+                self.icon_manufacturer,
+            )
+        elif borrowed:  # experiment: an identifier iOS has an icon for
             env["SPS_MODEL"] = borrowed
             self.log.info("AirPlay reports model '%s' (icon experiment)", borrowed)
         elif self.model:  # read by the patched shairport-sync

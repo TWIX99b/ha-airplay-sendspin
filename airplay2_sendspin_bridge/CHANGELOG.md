@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.5
+
+- Icon experiment: options `icon_model` and `icon_manufacturer` report any
+  model identifier / manufacturer (e.g. that of another AirPlay speaker).
+
 ## 0.9.4
 
 - **Security:** the integration token is no longer written to the add-on log

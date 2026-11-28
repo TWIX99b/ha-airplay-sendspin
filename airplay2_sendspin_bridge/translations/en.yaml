@@ -52,6 +52,16 @@ configuration:
       Express identifier for all speakers, whose icon iOS knows. Only the
       icon, no other features; iOS sometimes shows the standard icon again
       after connecting. Takes effect after a restart.
+  icon_model:
+    name: Own model identifier (experiment)
+    description: >-
+      Any model identifier for all speakers, e.g. that of another AirPlay
+      speaker. Wins over "Icon in the AirPlay menu". Empty = off. Takes effect
+      after a restart.
+  icon_manufacturer:
+    name: Own manufacturer (experiment)
+    description: >-
+      Manufacturer to go with the own model identifier. Empty = none.
   metadata:
     name: Pass on title and cover
     description: >-

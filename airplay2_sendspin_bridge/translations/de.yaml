@@ -56,6 +56,16 @@ configuration:
       Lautsprechern die Kennung einer AirPort Express, deren Symbol iOS kennt.
       Nur das Symbol, keine weiteren Funktionen; iOS zeigt nach dem Verbinden
       teils wieder das Standardsymbol. Wirkt nach einem Neustart.
+  icon_model:
+    name: Eigene Modellkennung (Experiment)
+    description: >-
+      Freie Modellkennung für alle Lautsprecher, z. B. die eines anderen
+      AirPlay-Lautsprechers. Gilt vor „Symbol im AirPlay-Menü“. Leer = aus.
+      Wirkt nach einem Neustart.
+  icon_manufacturer:
+    name: Eigener Hersteller (Experiment)
+    description: >-
+      Hersteller passend zur eigenen Modellkennung. Leer = keiner.
   metadata:
     name: Titel und Cover weitergeben
     description: >-
