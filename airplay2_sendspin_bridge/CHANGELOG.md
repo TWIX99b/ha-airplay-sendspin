@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.2
+
+- **Test tone always audible:** if the speaker is turned down below 40 %,
+  the test tone (page ♪ and HA button) plays at 40 % and the old volume is
+  restored afterwards. Before, a speaker at 3 % played it inaudibly.
+
 ## 0.9.1
 
 - **IP check at start:** before creating the AirPlay IP (`ap2_ip`) the

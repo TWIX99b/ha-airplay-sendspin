@@ -420,8 +420,12 @@ def test_speakers():
         found,
         [
             {"token_entity": found[0]["token_entity"], "device": "dup"},
-            {"token_entity": "sensor.x_sendspin_pairing_token", "device": "X",
-             "model": "echo-dot-3", "area": "Keller"},
+            {
+                "token_entity": "sensor.x_sendspin_pairing_token",
+                "device": "X",
+                "model": "echo-dot-3",
+                "area": "Keller",
+            },
         ],
     )
     extra = next(m for m in merged if m.get("disabled"))
@@ -429,7 +433,9 @@ def test_speakers():
     first_done = next((k for k, m in enumerate(merged) if m["configured"]), len(merged))
     check(merged.index(extra) < first_done, "discovery: disabled before configured")
     check(
-        extra["disabled"] and not extra["has_token"] and extra["model_name"] == "Echo Dot 3",
+        extra["disabled"]
+        and not extra["has_token"]
+        and extra["model_name"] == "Echo Dot 3",
         "discovery: disabled entry marked",
     )
 
@@ -544,6 +550,18 @@ async def test_tone_pair():
     zone.streaming = True
     check(not await zone.test_tone(), "test tone: refused while AirPlay plays")
 
+    # speaker turned almost all the way down: tone at 40 %, then back
+    side = FakeSide({"A": 3})
+    zone = bridge.Zone(
+        bridge.zone_config(0, {"name": "L", "host": "A", "port": 1}), side, OPTS
+    )
+    zone.links[0].client_id = "id"
+    check(await zone.test_tone(), "test tone: played at low volume")
+    check(
+        side.players["A"].history == [bridge.TONE_MIN_VOLUME, 3],
+        "test tone: quiet speaker raised to 40 %, then restored",
+    )
+
 
 async def test_stats():
     cfg = bridge.zone_config(0, {"name": "W", "host": "A", "port": 1})
@@ -585,7 +603,9 @@ async def test_timing_steady():
     times = [c[0] for c in commits]
     sizes = [len(c[1]) // bridge.CHUNK_BYTES for c in commits]
     # consecutive commits continue exactly where the previous one ended
-    gaps = [t2 - (t1 + n * bridge.CHUNK_US) for t1, t2, n in zip(times, times[1:], sizes)]
+    gaps = [
+        t2 - (t1 + n * bridge.CHUNK_US) for t1, t2, n in zip(times, times[1:], sizes)
+    ]
     check(max(abs(g) for g in gaps) <= 300, "timing: commits are contiguous")
     check(zone.stats["resyncs"] == 0, "timing: no restarts in a steady stream")
 

@@ -91,6 +91,7 @@ VOICE_IDLE_HOLD_S = 2.0
 # Test tone (web UI): a short two-tone chime straight to the speaker(s)
 TONE_GAP_S = 0.9  # stereo pair: left first, then right
 TONE_LEAD_US = 400_000
+TONE_MIN_VOLUME = 40  # a test tone at 3 % is no test: at least this loud
 MANUFACTURERS = {"echo": "Amazon"}  # model prefix → manufacturer if HA has none
 PCM_FORMAT = AudioFormat(sample_rate=SAMPLE_RATE, bit_depth=16, channels=CHANNELS)
 
@@ -941,7 +942,19 @@ class Zone:
             active = [link for link, ok in zip(ready, results, strict=True) if ok]
             if not active:
                 return False
+            raised: list[tuple[Link, int]] = []
             try:
+                for link in active:
+                    player = link.player
+                    if (
+                        player is not None
+                        and PlayerCommand.VOLUME in player.state_supported_commands
+                        and player.volume < TONE_MIN_VOLUME
+                    ):
+                        raised.append((link, player.volume))
+                        player.set_volume(TONE_MIN_VOLUME)
+                if raised:
+                    await asyncio.sleep(0.2)  # volume first, then the tone
                 total = TONE_GAP_S * len(active) + 0.4
                 for link in active:
                     link.stream = link.group.start_stream()
@@ -957,6 +970,15 @@ class Zone:
                 self.log.info("Test tone on %s", self.cfg.host)
                 await asyncio.sleep(total + TONE_LEAD_US / 1e6 + 0.3)
             finally:
+                for link, before in raised:
+                    with contextlib.suppress(Exception):
+                        link.player.set_volume(before)
+                if raised:
+                    self.log.info(
+                        "Test tone at %d %% (speaker was quieter), volume restored",
+                        TONE_MIN_VOLUME,
+                    )
+                    await asyncio.sleep(0.3)  # let the command go out
                 for link in active:
                     with contextlib.suppress(Exception):
                         await link.group.stop()
